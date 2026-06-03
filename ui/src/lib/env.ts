@@ -1,0 +1,2 @@
+export const workerApiBaseUrl =
+  process.env.NEXT_PUBLIC_WORKER_API_BASE_URL ?? "http://localhost:4000";

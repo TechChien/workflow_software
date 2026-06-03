@@ -1,0 +1,13 @@
+{
+  "name": "workflow-software",
+  "private": true,
+  "scripts": {
+    "dev:ui": "pnpm --filter @workflow-software/ui dev",
+    "dev:worker": "pnpm --filter @workflow-software/worker dev",
+    "build": "pnpm --filter @workflow-software/shared build && pnpm --filter @workflow-software/ui build && pnpm --filter @workflow-software/worker build",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "typescript": "latest"
+  }
+}

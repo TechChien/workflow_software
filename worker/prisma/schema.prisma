@@ -1,0 +1,230 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum WorkflowRunStatus {
+  PENDING
+  RUNNING
+  WAITING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum StepRunStatus {
+  PENDING
+  READY
+  RUNNING
+  WAITING_FOR_CODEX_PERMISSION
+  WAITING_FOR_CODEX_QUESTION
+  WAITING_FOR_HUMAN_REVIEW
+  WAITING_FOR_EVALUATOR_FEEDBACK
+  ACCEPTED
+  REJECTED
+  FAILED
+  STALE
+}
+
+enum ArtifactStatus {
+  CANDIDATE
+  ACCEPTED
+  REJECTED
+  SUPERSEDED
+  STALE
+}
+
+enum DecisionSource {
+  EVALUATOR
+  HUMAN
+}
+
+enum DecisionVerdict {
+  APPROVE
+  REJECT
+  REQUEST_REVISION
+}
+
+model Workflow {
+  id        String            @id @default(cuid())
+  name      String
+  draftYaml String            @db.Text
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  versions  WorkflowVersion[]
+}
+
+model WorkflowVersion {
+  id           String        @id @default(cuid())
+  workflowId   String
+  version      Int
+  yamlSnapshot String        @db.Text
+  contentHash  String
+  publishedAt  DateTime      @default(now())
+  workflow     Workflow      @relation(fields: [workflowId], references: [id])
+  runs         WorkflowRun[]
+
+  @@unique([workflowId, version])
+}
+
+model WorkflowRun {
+  id                String              @id @default(cuid())
+  workflowVersionId String
+  status            WorkflowRunStatus   @default(PENDING)
+  triggerType       String              @default("run_button")
+  inputPayload      Json                @default("{}")
+  createdAt         DateTime            @default(now())
+  startedAt         DateTime?
+  completedAt       DateTime?
+  workflowVersion   WorkflowVersion     @relation(fields: [workflowVersionId], references: [id])
+  stepRuns          StepRun[]
+  artifactVersions  ArtifactVersion[]
+  decisionEvents    DecisionEvent[]
+  runEvents         RunEvent[]
+  codeWorkspaces    CodeWorkspace[]
+}
+
+model StepRun {
+  id                  String                 @id @default(cuid())
+  workflowRunId        String
+  stepId              String
+  attempt             Int                    @default(1)
+  status              StepRunStatus          @default(PENDING)
+  upstreamStepRunId    String?
+  downstreamStepRunId  String?
+  codexThreadId       String?
+  codeWorkspaceId     String?
+  beforeCommit        String?
+  afterCommit         String?
+  requiresCodeReview  Boolean                @default(false)
+  staleReason         String?
+  createdAt           DateTime               @default(now())
+  startedAt           DateTime?
+  completedAt         DateTime?
+  workflowRun         WorkflowRun            @relation(fields: [workflowRunId], references: [id])
+  artifactInputs      StepRunArtifactInput[]
+  producedArtifacts   ArtifactVersion[]
+  decisionEvents      DecisionEvent[]
+  toolInvocations     ToolInvocation[]
+  contextPathEvents   ContextPathEvent[]
+  codexInteractions   CodexInteractionEvent[]
+  codeChangeRecords   CodeChangeRecord[]
+
+  @@index([workflowRunId, status])
+}
+
+model StepRunArtifactInput {
+  id                String          @id @default(cuid())
+  stepRunId         String
+  artifactKey       String
+  artifactVersionId String
+  stepRun           StepRun         @relation(fields: [stepRunId], references: [id])
+  artifactVersion   ArtifactVersion @relation(fields: [artifactVersionId], references: [id])
+
+  @@unique([stepRunId, artifactKey])
+}
+
+model ArtifactVersion {
+  id                 String                 @id @default(cuid())
+  workflowRunId       String
+  artifactKey         String
+  version             Int
+  producerStepRunId   String
+  parentVersionId     String?
+  status              ArtifactStatus         @default(CANDIDATE)
+  contentUri          String
+  contentHash         String
+  createdAt           DateTime               @default(now())
+  acceptedAt          DateTime?
+  workflowRun         WorkflowRun            @relation(fields: [workflowRunId], references: [id])
+  producerStepRun     StepRun                @relation(fields: [producerStepRunId], references: [id])
+  stepRunInputs       StepRunArtifactInput[]
+
+  @@unique([workflowRunId, artifactKey, version])
+  @@index([workflowRunId, artifactKey, status])
+}
+
+model DecisionEvent {
+  id            String          @id @default(cuid())
+  workflowRunId String
+  stepRunId     String
+  source        DecisionSource
+  verdict       DecisionVerdict
+  comment       String?
+  targetStepId  String?
+  createdAt     DateTime        @default(now())
+  workflowRun   WorkflowRun     @relation(fields: [workflowRunId], references: [id])
+  stepRun       StepRun         @relation(fields: [stepRunId], references: [id])
+}
+
+model CodexInteractionEvent {
+  id        String   @id @default(cuid())
+  stepRunId String
+  kind      String
+  prompt    String   @db.Text
+  status    String
+  payload   Json     @default("{}")
+  createdAt DateTime @default(now())
+  stepRun   StepRun  @relation(fields: [stepRunId], references: [id])
+}
+
+model ContextPathEvent {
+  id        String   @id @default(cuid())
+  stepRunId String
+  path      String
+  type      String
+  status    String
+  reason    String?
+  createdAt DateTime @default(now())
+  stepRun   StepRun  @relation(fields: [stepRunId], references: [id])
+}
+
+model ToolInvocation {
+  id                String   @id @default(cuid())
+  stepRunId         String
+  toolName          String
+  status            String
+  argumentsRedacted Json     @default("{}")
+  resultRef         String?
+  createdAt         DateTime @default(now())
+  stepRun           StepRun  @relation(fields: [stepRunId], references: [id])
+}
+
+model RunEvent {
+  id            String      @id @default(cuid())
+  workflowRunId String
+  eventType     String
+  payload       Json        @default("{}")
+  createdAt     DateTime    @default(now())
+  workflowRun   WorkflowRun @relation(fields: [workflowRunId], references: [id])
+}
+
+model CodeWorkspace {
+  id            String             @id @default(cuid())
+  workflowRunId String
+  repoPath      String
+  baseRef       String
+  worktreePath  String
+  baseCommit    String
+  createdAt     DateTime           @default(now())
+  workflowRun   WorkflowRun        @relation(fields: [workflowRunId], references: [id])
+  changes       CodeChangeRecord[]
+}
+
+model CodeChangeRecord {
+  id              String        @id @default(cuid())
+  stepRunId        String
+  codeWorkspaceId  String
+  beforeCommit     String
+  afterCommit      String?
+  diffUri          String?
+  diffHash         String?
+  status           String
+  createdAt        DateTime      @default(now())
+  stepRun          StepRun       @relation(fields: [stepRunId], references: [id])
+  codeWorkspace    CodeWorkspace @relation(fields: [codeWorkspaceId], references: [id])
+}

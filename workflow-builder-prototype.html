@@ -1,0 +1,1540 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Workflow Builder Prototype</title>
+  <style>
+    :root {
+      --bg: #f4f5f7;
+      --surface: #ffffff;
+      --surface-2: #eef1f4;
+      --ink: #20242a;
+      --muted: #66717d;
+      --line: #d5dbe1;
+      --line-strong: #aeb8c2;
+      --teal: #137f74;
+      --teal-soft: #e3f3f1;
+      --amber: #9b6514;
+      --amber-soft: #fff1d6;
+      --red: #b13d3d;
+      --red-soft: #fde7e7;
+      --blue: #2f6fbb;
+      --blue-soft: #e7f0fb;
+      --shadow: 0 12px 30px rgba(31, 41, 55, 0.12);
+      --radius: 8px;
+      --header-h: 56px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, "Noto Sans TC", "Microsoft JhengHei", Arial, sans-serif;
+      font-size: 14px;
+      letter-spacing: 0;
+    }
+
+    button,
+    input,
+    textarea,
+    select {
+      font: inherit;
+    }
+
+    button {
+      border: 0;
+      cursor: pointer;
+    }
+
+    .app {
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: var(--header-h) 1fr;
+    }
+
+    .topbar {
+      height: var(--header-h);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 0 18px;
+      border-bottom: 1px solid var(--line);
+      background: var(--surface);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      background: var(--teal);
+      position: relative;
+      flex: 0 0 auto;
+    }
+
+    .brand-mark::before,
+    .brand-mark::after {
+      content: "";
+      position: absolute;
+      background: #fff;
+      border-radius: 99px;
+    }
+
+    .brand-mark::before {
+      width: 15px;
+      height: 3px;
+      left: 7px;
+      top: 9px;
+    }
+
+    .brand-mark::after {
+      width: 3px;
+      height: 15px;
+      left: 13px;
+      top: 7px;
+    }
+
+    .brand-title {
+      min-width: 0;
+    }
+
+    .brand-title strong {
+      display: block;
+      font-size: 15px;
+      line-height: 18px;
+    }
+
+    .brand-title span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 16px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .icon-button,
+    .text-button,
+    .seg-button {
+      height: 34px;
+      border: 1px solid var(--line);
+      background: var(--surface);
+      color: var(--ink);
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      white-space: nowrap;
+    }
+
+    .icon-button {
+      width: 34px;
+      padding: 0;
+    }
+
+    .icon-button svg,
+    .text-button svg,
+    .palette-icon svg,
+    .field-icon svg {
+      width: 16px;
+      height: 16px;
+      stroke: currentColor;
+      stroke-width: 2;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .text-button {
+      padding: 0 12px;
+    }
+
+    .text-button.primary {
+      background: var(--teal);
+      border-color: var(--teal);
+      color: #fff;
+    }
+
+    .workspace {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 248px minmax(520px, 1fr) 392px;
+    }
+
+    .sidebar,
+    .inspector {
+      min-height: 0;
+      background: var(--surface);
+      border-right: 1px solid var(--line);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .inspector {
+      border-right: 0;
+      border-left: 1px solid var(--line);
+    }
+
+    .panel-header {
+      min-height: 48px;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .panel-title {
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .panel-subtitle {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 16px;
+    }
+
+    .palette-list,
+    .settings {
+      padding: 12px;
+      overflow: auto;
+    }
+
+    .palette-item {
+      width: 100%;
+      border: 1px solid var(--line);
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 10px;
+      display: grid;
+      grid-template-columns: 32px 1fr;
+      gap: 10px;
+      text-align: left;
+      margin-bottom: 8px;
+    }
+
+    .palette-item:hover {
+      border-color: var(--line-strong);
+      background: #fbfcfd;
+    }
+
+    .palette-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--teal);
+      background: var(--teal-soft);
+    }
+
+    .palette-icon.human {
+      color: var(--amber);
+      background: var(--amber-soft);
+    }
+
+    .palette-icon.tool {
+      color: var(--blue);
+      background: var(--blue-soft);
+    }
+
+    .palette-item strong {
+      display: block;
+      font-size: 13px;
+      line-height: 18px;
+    }
+
+    .palette-item span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 16px;
+      margin-top: 2px;
+    }
+
+    .run-summary {
+      margin: auto 12px 12px;
+      padding: 12px;
+      background: var(--surface-2);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+    }
+
+    .summary-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .summary-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .summary-row strong {
+      color: var(--ink);
+      font-size: 13px;
+    }
+
+    .canvas-shell {
+      min-height: 0;
+      display: grid;
+      grid-template-rows: 48px 1fr 152px;
+      background: #f7f8fa;
+    }
+
+    .canvas-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--line);
+      background: var(--surface);
+    }
+
+    .breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .breadcrumb strong {
+      color: var(--ink);
+      font-size: 13px;
+    }
+
+    .segmented {
+      height: 34px;
+      display: inline-flex;
+      border: 1px solid var(--line);
+      background: #f6f7f9;
+      border-radius: 6px;
+      padding: 2px;
+      flex: 0 0 auto;
+    }
+
+    .seg-button {
+      height: 28px;
+      min-width: 68px;
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      padding: 0 10px;
+    }
+
+    .seg-button.active {
+      background: var(--surface);
+      color: var(--ink);
+      box-shadow: 0 1px 2px rgba(31, 41, 55, 0.1);
+    }
+
+    .canvas {
+      min-height: 0;
+      position: relative;
+      overflow: hidden;
+      background-image:
+        linear-gradient(var(--line) 1px, transparent 1px),
+        linear-gradient(90deg, var(--line) 1px, transparent 1px);
+      background-size: 28px 28px;
+      background-color: #f8fafb;
+    }
+
+    .edge-layer {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    .edge-layer path {
+      fill: none;
+      stroke: #8b97a4;
+      stroke-width: 2;
+    }
+
+    .edge-layer .pending {
+      stroke-dasharray: 6 6;
+      stroke: var(--amber);
+    }
+
+    .node {
+      width: 248px;
+      min-height: 128px;
+      position: absolute;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: 0 8px 18px rgba(31, 41, 55, 0.1);
+      user-select: none;
+    }
+
+    .node.selected {
+      border-color: var(--teal);
+      box-shadow: 0 0 0 3px rgba(19, 127, 116, 0.16), var(--shadow);
+    }
+
+    .node-header {
+      height: 42px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 0 12px;
+      border-bottom: 1px solid var(--line);
+      cursor: grab;
+    }
+
+    .node.dragging .node-header {
+      cursor: grabbing;
+    }
+
+    .node-name {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      font-weight: 700;
+      font-size: 13px;
+    }
+
+    .node-name span {
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .node-type {
+      width: 22px;
+      height: 22px;
+      border-radius: 5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--teal);
+      background: var(--teal-soft);
+      flex: 0 0 auto;
+    }
+
+    .node-type svg {
+      width: 14px;
+      height: 14px;
+      stroke: currentColor;
+      stroke-width: 2;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .node-type.human {
+      color: var(--amber);
+      background: var(--amber-soft);
+    }
+
+    .node-badge {
+      display: inline-flex;
+      align-items: center;
+      height: 22px;
+      padding: 0 8px;
+      border-radius: 999px;
+      background: var(--teal-soft);
+      color: var(--teal);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .node-badge.waiting {
+      background: var(--amber-soft);
+      color: var(--amber);
+    }
+
+    .node-body {
+      padding: 10px 12px 12px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .node-row {
+      display: grid;
+      grid-template-columns: 18px 1fr 18px;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 16px;
+    }
+
+    .node-row strong {
+      color: var(--ink);
+      font-size: 12px;
+      font-weight: 700;
+      display: block;
+    }
+
+    .port {
+      width: 12px;
+      height: 12px;
+      border: 2px solid var(--surface);
+      border-radius: 50%;
+      background: var(--line-strong);
+      box-shadow: 0 0 0 1px var(--line-strong);
+      justify-self: center;
+    }
+
+    .port.in {
+      background: var(--blue);
+      box-shadow: 0 0 0 1px var(--blue);
+    }
+
+    .port.out {
+      background: var(--teal);
+      box-shadow: 0 0 0 1px var(--teal);
+    }
+
+    .port.pause {
+      background: var(--amber);
+      box-shadow: 0 0 0 1px var(--amber);
+    }
+
+    .bottom-panel {
+      min-height: 0;
+      border-top: 1px solid var(--line);
+      background: var(--surface);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .timeline,
+    .artifact-feed {
+      min-width: 0;
+      padding: 12px;
+      overflow: auto;
+    }
+
+    .timeline {
+      border-right: 1px solid var(--line);
+    }
+
+    .section-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 10px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--ink);
+    }
+
+    .timeline-list,
+    .artifact-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .event,
+    .artifact {
+      display: grid;
+      grid-template-columns: 8px 1fr auto;
+      align-items: start;
+      gap: 8px;
+      min-width: 0;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      margin-top: 5px;
+      border-radius: 50%;
+      background: var(--teal);
+    }
+
+    .dot.waiting {
+      background: var(--amber);
+    }
+
+    .dot.failed {
+      background: var(--red);
+    }
+
+    .event strong,
+    .artifact strong {
+      display: block;
+      color: var(--ink);
+      font-size: 12px;
+      line-height: 16px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .event time,
+    .artifact span {
+      color: var(--muted);
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid var(--line);
+      background: #fbfcfd;
+    }
+
+    .tab {
+      flex: 1 1 0;
+      height: 42px;
+      border: 0;
+      border-bottom: 2px solid transparent;
+      background: transparent;
+      color: var(--muted);
+      font-weight: 700;
+      font-size: 12px;
+    }
+
+    .tab.active {
+      color: var(--teal);
+      border-color: var(--teal);
+      background: var(--surface);
+    }
+
+    .tab-panel {
+      min-height: 0;
+      display: none;
+      flex: 1;
+      overflow: auto;
+    }
+
+    .tab-panel.active {
+      display: block;
+    }
+
+    .selected-step {
+      padding: 14px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .selected-step h2 {
+      margin: 0 0 4px;
+      font-size: 16px;
+      line-height: 22px;
+    }
+
+    .selected-step p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 16px;
+    }
+
+    .status-pill {
+      height: 24px;
+      display: inline-flex;
+      align-items: center;
+      padding: 0 8px;
+      border-radius: 999px;
+      background: var(--teal-soft);
+      color: var(--teal);
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .status-pill.waiting {
+      background: var(--amber-soft);
+      color: var(--amber);
+    }
+
+    .field-group {
+      margin-bottom: 14px;
+    }
+
+    .field-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 6px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .field-label span {
+      color: var(--muted);
+      font-weight: 500;
+    }
+
+    .text-input,
+    .select-input,
+    .textarea-input {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--surface);
+      color: var(--ink);
+      padding: 8px 10px;
+      outline: none;
+    }
+
+    .text-input:focus,
+    .select-input:focus,
+    .textarea-input:focus {
+      border-color: var(--teal);
+      box-shadow: 0 0 0 3px rgba(19, 127, 116, 0.14);
+    }
+
+    .textarea-input {
+      min-height: 92px;
+      resize: vertical;
+      line-height: 18px;
+    }
+
+    .chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .chip {
+      height: 28px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fbfcfd;
+      padding: 0 10px;
+      color: var(--ink);
+      font-size: 12px;
+    }
+
+    .chip.active {
+      border-color: var(--teal);
+      background: var(--teal-soft);
+      color: var(--teal);
+      font-weight: 700;
+    }
+
+    .check-row {
+      display: grid;
+      grid-template-columns: 18px 1fr;
+      gap: 8px;
+      align-items: start;
+      margin-bottom: 8px;
+      color: var(--muted);
+      line-height: 18px;
+    }
+
+    .check-row input {
+      width: 16px;
+      height: 16px;
+      margin: 1px 0 0;
+      accent-color: var(--teal);
+    }
+
+    .review-box {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: #fbfcfd;
+    }
+
+    .review-box textarea {
+      min-height: 96px;
+      border: 0;
+      border-bottom: 1px solid var(--line);
+      border-radius: 0;
+      background: transparent;
+    }
+
+    .review-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      padding: 8px;
+    }
+
+    .review-actions .text-button {
+      width: 100%;
+    }
+
+    .review-actions .reject {
+      border-color: #efb7b7;
+      color: var(--red);
+      background: var(--red-soft);
+    }
+
+    .yaml-panel {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .yaml-toolbar {
+      height: 42px;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .yaml-code {
+      flex: 1;
+      margin: 0;
+      padding: 14px;
+      overflow: auto;
+      background: #20242a;
+      color: #e9eef2;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 12px;
+      line-height: 18px;
+      white-space: pre;
+    }
+
+    .mini-map {
+      position: absolute;
+      right: 14px;
+      bottom: 14px;
+      width: 138px;
+      height: 86px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.92);
+      border-radius: var(--radius);
+      box-shadow: 0 6px 16px rgba(31, 41, 55, 0.12);
+      padding: 8px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      align-items: center;
+    }
+
+    .mini-node {
+      height: 20px;
+      border-radius: 4px;
+      background: var(--teal-soft);
+      border: 1px solid rgba(19, 127, 116, 0.35);
+    }
+
+    .mini-node.waiting {
+      background: var(--amber-soft);
+      border-color: rgba(155, 101, 20, 0.35);
+    }
+
+    @media (max-width: 1120px) {
+      .workspace {
+        grid-template-columns: 220px minmax(430px, 1fr) 340px;
+      }
+
+      .node {
+        width: 224px;
+      }
+    }
+
+    @media (max-width: 900px) {
+      .workspace {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto minmax(520px, 1fr) auto;
+      }
+
+      .sidebar,
+      .inspector {
+        border: 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .palette-list {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .palette-item {
+        margin-bottom: 0;
+      }
+
+      .run-summary {
+        display: none;
+      }
+
+      .canvas-shell {
+        grid-template-rows: 48px 520px 172px;
+      }
+
+      .inspector {
+        min-height: 480px;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .topbar {
+        padding: 0 10px;
+      }
+
+      .brand-title span,
+      .breadcrumb {
+        display: none;
+      }
+
+      .top-actions .text-button:not(.primary) {
+        display: none;
+      }
+
+      .palette-list {
+        grid-template-columns: 1fr;
+      }
+
+      .canvas-shell {
+        grid-template-rows: 48px 500px 220px;
+      }
+
+      .bottom-panel {
+        grid-template-columns: 1fr;
+      }
+
+      .timeline {
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true"></div>
+        <div class="brand-title">
+          <strong>Workflow Builder</strong>
+          <span>product-research-flow / v1.0.0</span>
+        </div>
+      </div>
+
+      <div class="top-actions">
+        <button class="icon-button" type="button" title="Undo" aria-label="Undo">
+          <svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"></path><path d="M4 9h11a5 5 0 0 1 0 10h-1"></path></svg>
+        </button>
+        <button class="icon-button" type="button" title="Redo" aria-label="Redo">
+          <svg viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"></path><path d="M20 9H9a5 5 0 0 0 0 10h1"></path></svg>
+        </button>
+        <button class="text-button" type="button">
+          <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M7 10l5 5 5-5"></path><path d="M12 15V3"></path></svg>
+          Export YAML
+        </button>
+        <button class="text-button primary" type="button">
+          <svg viewBox="0 0 24 24"><path d="m5 3 14 9-14 9V3z"></path></svg>
+          Run Preview
+        </button>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <aside class="sidebar">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">Node Library</div>
+            <div class="panel-subtitle">Drag to canvas</div>
+          </div>
+        </div>
+
+        <div class="palette-list">
+          <button class="palette-item" type="button">
+            <span class="palette-icon">
+              <svg viewBox="0 0 24 24"><path d="M12 8V4H8"></path><rect x="4" y="12" width="6" height="6" rx="1"></rect><rect x="14" y="12" width="6" height="6" rx="1"></rect><path d="M12 8v4"></path><path d="M7 12V8h10v4"></path></svg>
+            </span>
+            <span>
+              <strong>Agent Step</strong>
+              <span>Prompt, tools, criteria</span>
+            </span>
+          </button>
+
+          <button class="palette-item" type="button">
+            <span class="palette-icon human">
+              <svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-8 0v2"></path><circle cx="12" cy="7" r="4"></circle><path d="m16 11 2 2 4-4"></path></svg>
+            </span>
+            <span>
+              <strong>Human Review</strong>
+              <span>Approve, reject, comment</span>
+            </span>
+          </button>
+
+          <button class="palette-item" type="button">
+            <span class="palette-icon tool">
+              <svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.1-3.1a6 6 0 0 1-7.7 7.7l-6 6a2.1 2.1 0 0 1-3-3l6-6a6 6 0 0 1 7.7-7.7l-3.1 3.1z"></path></svg>
+            </span>
+            <span>
+              <strong>Tool Action</strong>
+              <span>API, script, RPA call</span>
+            </span>
+          </button>
+        </div>
+
+        <div class="run-summary">
+          <div class="summary-row"><span>Steps</span><strong>4</strong></div>
+          <div class="summary-row"><span>Artifacts</span><strong>3</strong></div>
+          <div class="summary-row"><span>Human gates</span><strong>1</strong></div>
+          <div class="summary-row"><span>Current state</span><strong>Draft</strong></div>
+        </div>
+      </aside>
+
+      <section class="canvas-shell" aria-label="Workflow canvas">
+        <div class="canvas-toolbar">
+          <div class="breadcrumb">
+            <strong>Canvas</strong>
+            <span>/</span>
+            <span>AI market research pipeline</span>
+          </div>
+          <div class="segmented" role="tablist" aria-label="Canvas mode">
+            <button class="seg-button active" type="button">Design</button>
+            <button class="seg-button" type="button">Run</button>
+          </div>
+        </div>
+
+        <div class="canvas" id="canvas">
+          <svg class="edge-layer" id="edgeLayer" viewBox="0 0 900 520" preserveAspectRatio="none" aria-hidden="true"></svg>
+
+          <article class="node selected" data-step="summarize_market" style="left: 84px; top: 74px;">
+            <div class="node-header">
+              <div class="node-name">
+                <span class="node-type">
+                  <svg viewBox="0 0 24 24"><path d="M12 8V4H8"></path><rect x="4" y="12" width="6" height="6" rx="1"></rect><rect x="14" y="12" width="6" height="6" rx="1"></rect><path d="M12 8v4"></path><path d="M7 12V8h10v4"></path></svg>
+                </span>
+                <span>summarize_market</span>
+              </div>
+              <span class="node-badge">Agent</span>
+            </div>
+            <div class="node-body">
+              <div class="node-row">
+                <span class="port in" data-port="in"></span>
+                <div><strong>inputs</strong>topic, region</div>
+                <span></span>
+              </div>
+              <div class="node-row">
+                <span></span>
+                <div><strong>artifacts</strong>market_summary.md</div>
+                <span class="port out" data-port="out"></span>
+              </div>
+              <div class="node-row">
+                <span></span>
+                <div><strong>criteria</strong>users, risks, opportunities</div>
+                <span></span>
+              </div>
+            </div>
+          </article>
+
+          <article class="node" data-step="review_market_summary" style="left: 398px; top: 112px;">
+            <div class="node-header">
+              <div class="node-name">
+                <span class="node-type human">
+                  <svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-8 0v2"></path><circle cx="12" cy="7" r="4"></circle><path d="m16 11 2 2 4-4"></path></svg>
+                </span>
+                <span>review_market_summary</span>
+              </div>
+              <span class="node-badge waiting">Pause</span>
+            </div>
+            <div class="node-body">
+              <div class="node-row">
+                <span class="port in" data-port="in"></span>
+                <div><strong>inputs</strong>market_summary.latest</div>
+                <span></span>
+              </div>
+              <div class="node-row">
+                <span></span>
+                <div><strong>decision</strong>approve or reject with comment</div>
+                <span class="port pause" data-port="out"></span>
+              </div>
+              <div class="node-row">
+                <span></span>
+                <div><strong>steer</strong>comment to previous agent</div>
+                <span></span>
+              </div>
+            </div>
+          </article>
+
+          <article class="node" data-step="generate_spec" style="left: 652px; top: 292px;">
+            <div class="node-header">
+              <div class="node-name">
+                <span class="node-type">
+                  <svg viewBox="0 0 24 24"><path d="M12 8V4H8"></path><rect x="4" y="12" width="6" height="6" rx="1"></rect><rect x="14" y="12" width="6" height="6" rx="1"></rect><path d="M12 8v4"></path><path d="M7 12V8h10v4"></path></svg>
+                </span>
+                <span>generate_spec</span>
+              </div>
+              <span class="node-badge">Agent</span>
+            </div>
+            <div class="node-body">
+              <div class="node-row">
+                <span class="port in" data-port="in"></span>
+                <div><strong>inputs</strong>reviewed summary</div>
+                <span></span>
+              </div>
+              <div class="node-row">
+                <span></span>
+                <div><strong>artifacts</strong>product_spec.md</div>
+                <span class="port out" data-port="out"></span>
+              </div>
+              <div class="node-row">
+                <span></span>
+                <div><strong>criteria</strong>actionable, scoped, testable</div>
+                <span></span>
+              </div>
+            </div>
+          </article>
+
+          <div class="mini-map" aria-hidden="true">
+            <span class="mini-node"></span>
+            <span class="mini-node waiting"></span>
+            <span></span>
+            <span></span>
+            <span class="mini-node"></span>
+            <span></span>
+          </div>
+        </div>
+
+        <div class="bottom-panel">
+          <section class="timeline">
+            <div class="section-label">
+              <span>Run Timeline</span>
+              <span class="panel-subtitle">preview</span>
+            </div>
+            <div class="timeline-list">
+              <div class="event">
+                <span class="dot"></span>
+                <div><strong>summarize_market accepted</strong>market_summary v1 created</div>
+                <time>10:12</time>
+              </div>
+              <div class="event">
+                <span class="dot waiting"></span>
+                <div><strong>review_market_summary waiting</strong>human comment required before next step</div>
+                <time>10:13</time>
+              </div>
+              <div class="event">
+                <span class="dot failed"></span>
+                <div><strong>generate_spec blocked</strong>dependency has not been approved</div>
+                <time>--</time>
+              </div>
+            </div>
+          </section>
+
+          <section class="artifact-feed">
+            <div class="section-label">
+              <span>Artifact Versions</span>
+              <span class="panel-subtitle">immutable</span>
+            </div>
+            <div class="artifact-list">
+              <div class="artifact">
+                <span class="dot"></span>
+                <div><strong>market_summary.md</strong>producer: summarize_market</div>
+                <span>v1</span>
+              </div>
+              <div class="artifact">
+                <span class="dot waiting"></span>
+                <div><strong>review_comment.txt</strong>producer: human_review</div>
+                <span>draft</span>
+              </div>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <aside class="inspector">
+        <div class="tabs">
+          <button class="tab active" type="button" data-tab="settings">Step</button>
+          <button class="tab" type="button" data-tab="yaml">YAML</button>
+        </div>
+
+        <section class="tab-panel active" id="settingsPanel">
+          <div class="selected-step">
+            <div>
+              <h2 id="stepTitle">summarize_market</h2>
+              <p id="stepSubtitle">Agent step / produces market_summary.md</p>
+            </div>
+            <span class="status-pill" id="stepStatus">Ready</span>
+          </div>
+
+          <div class="settings">
+            <div class="field-group">
+              <label class="field-label" for="stepName">Step name <span>id</span></label>
+              <input class="text-input" id="stepName" type="text" value="summarize_market">
+            </div>
+
+            <div class="field-group">
+              <label class="field-label" for="stepType">Type</label>
+              <select class="select-input" id="stepType">
+                <option value="agent">Agent</option>
+                <option value="human_review">Human Review</option>
+                <option value="tool_action">Tool Action</option>
+              </select>
+            </div>
+
+            <div class="field-group agent-field">
+              <label class="field-label" for="promptBox">Prompt</label>
+              <textarea class="textarea-input" id="promptBox">Summarize the market for ${workflow.inputs.topic}. Include target users, risks, opportunities, and open questions.</textarea>
+            </div>
+
+            <div class="field-group agent-field">
+              <div class="field-label">Tools <span>allowlist</span></div>
+              <div class="chip-row">
+                <button class="chip active" type="button">web_search</button>
+                <button class="chip active" type="button">knowledge_base</button>
+                <button class="chip" type="button">crm_lookup</button>
+                <button class="chip" type="button">rpa_task</button>
+              </div>
+            </div>
+
+            <div class="field-group">
+              <div class="field-label">Inputs <span>left ports</span></div>
+              <input class="text-input" id="inputsBox" type="text" value="topic: ${workflow.inputs.topic}, region: ${workflow.inputs.region}">
+            </div>
+
+            <div class="field-group">
+              <div class="field-label">Artifact <span>right ports</span></div>
+              <input class="text-input" id="artifactBox" type="text" value="market_summary.md">
+            </div>
+
+            <div class="field-group">
+              <div class="field-label">Acceptance Criteria</div>
+              <label class="check-row">
+                <input type="checkbox" checked>
+                <span>Must include target users</span>
+              </label>
+              <label class="check-row">
+                <input type="checkbox" checked>
+                <span>Must include risks and opportunities</span>
+              </label>
+              <label class="check-row">
+                <input type="checkbox" checked>
+                <span>Must include open questions for human review</span>
+              </label>
+            </div>
+
+            <div class="field-group">
+              <label class="field-label" for="rejectBehavior">Reject behavior</label>
+              <select class="select-input" id="rejectBehavior">
+                <option value="rerun_same_step">Rerun same step with human comment</option>
+                <option value="return_to_previous">Return to previous dependency</option>
+                <option value="stop_run">Stop run</option>
+              </select>
+            </div>
+
+            <div class="field-group human-field" hidden>
+              <div class="field-label">Human Review</div>
+              <div class="review-box">
+                <textarea class="textarea-input" id="commentBox">Please add enterprise customer analysis and clarify the assumptions behind market size.</textarea>
+                <div class="review-actions">
+                  <button class="text-button reject" type="button">Reject</button>
+                  <button class="text-button primary" type="button">Approve</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="tab-panel yaml-panel" id="yamlPanel">
+          <div class="yaml-toolbar">
+            <span class="panel-title">workflow.yaml</span>
+            <button class="icon-button" type="button" title="Copy YAML" aria-label="Copy YAML">
+              <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            </button>
+          </div>
+          <pre class="yaml-code" id="yamlCode"></pre>
+        </section>
+      </aside>
+    </main>
+  </div>
+
+  <script>
+    const steps = {
+      summarize_market: {
+        title: "summarize_market",
+        type: "agent",
+        status: "Ready",
+        subtitle: "Agent step / produces market_summary.md",
+        inputs: "topic: ${workflow.inputs.topic}, region: ${workflow.inputs.region}",
+        artifact: "market_summary.md",
+        prompt: "Summarize the market for ${workflow.inputs.topic}. Include target users, risks, opportunities, and open questions.",
+        rejectBehavior: "rerun_same_step"
+      },
+      review_market_summary: {
+        title: "review_market_summary",
+        type: "human_review",
+        status: "Waiting",
+        subtitle: "Human review / pauses the run",
+        inputs: "summary: ${artifacts.market_summary.latest}",
+        artifact: "review_comment.txt",
+        prompt: "",
+        rejectBehavior: "rerun_same_step"
+      },
+      generate_spec: {
+        title: "generate_spec",
+        type: "agent",
+        status: "Blocked",
+        subtitle: "Agent step / produces product_spec.md",
+        inputs: "reviewed_summary: ${steps.review_market_summary.output}",
+        artifact: "product_spec.md",
+        prompt: "Generate an actionable product spec from the reviewed market summary.",
+        rejectBehavior: "return_to_previous"
+      }
+    };
+
+    const canvas = document.getElementById("canvas");
+    const edgeLayer = document.getElementById("edgeLayer");
+    const nodes = Array.from(document.querySelectorAll(".node"));
+    const stepTitle = document.getElementById("stepTitle");
+    const stepSubtitle = document.getElementById("stepSubtitle");
+    const stepStatus = document.getElementById("stepStatus");
+    const stepName = document.getElementById("stepName");
+    const stepType = document.getElementById("stepType");
+    const promptBox = document.getElementById("promptBox");
+    const inputsBox = document.getElementById("inputsBox");
+    const artifactBox = document.getElementById("artifactBox");
+    const rejectBehavior = document.getElementById("rejectBehavior");
+    const yamlCode = document.getElementById("yamlCode");
+    const agentFields = Array.from(document.querySelectorAll(".agent-field"));
+    const humanFields = Array.from(document.querySelectorAll(".human-field"));
+
+    let activeStepId = "summarize_market";
+
+    function selectStep(id) {
+      activeStepId = id;
+      const step = steps[id];
+
+      nodes.forEach(node => node.classList.toggle("selected", node.dataset.step === id));
+
+      stepTitle.textContent = step.title;
+      stepSubtitle.textContent = step.subtitle;
+      stepStatus.textContent = step.status;
+      stepStatus.classList.toggle("waiting", step.status === "Waiting");
+      stepName.value = step.title;
+      stepType.value = step.type;
+      promptBox.value = step.prompt;
+      inputsBox.value = step.inputs;
+      artifactBox.value = step.artifact;
+      rejectBehavior.value = step.rejectBehavior;
+
+      const isHuman = step.type === "human_review";
+      agentFields.forEach(field => field.hidden = isHuman);
+      humanFields.forEach(field => field.hidden = !isHuman);
+      renderYaml();
+    }
+
+    function renderYaml() {
+      const current = steps[activeStepId];
+      yamlCode.textContent = `id: product-research-flow
+version: 1.0.0
+ui:
+  source: visual-builder
+  selected_step: ${current.title}
+
+inputs:
+  topic:
+    type: string
+  region:
+    type: string
+
+artifacts:
+  market_summary:
+    type: text
+    format: markdown
+    versioning: immutable
+  review_comment:
+    type: text
+    format: plain
+    versioning: immutable
+  product_spec:
+    type: text
+    format: markdown
+    versioning: immutable
+
+steps:
+  - id: summarize_market
+    type: agent
+    depends_on: []
+    inputs:
+      topic: \${workflow.inputs.topic}
+      region: \${workflow.inputs.region}
+    prompt: prompts/summarize_market.md
+    tools:
+      - web_search
+      - knowledge_base
+    outputs:
+      - artifact: market_summary
+        file: market_summary.md
+    acceptance:
+      mode: auto
+      criteria:
+        - Must include target users
+        - Must include risks and opportunities
+        - Must include open questions
+    revision:
+      on_reject: rerun_same_step
+      include_human_comment: true
+
+  - id: review_market_summary
+    type: human_review
+    depends_on:
+      - summarize_market
+    pause: true
+    inputs:
+      summary: \${artifacts.market_summary.latest}
+    actions:
+      - approve
+      - reject_with_comment
+    on_reject:
+      target_step: summarize_market
+      pass_comment_as: reviewer_feedback
+
+  - id: generate_spec
+    type: agent
+    depends_on:
+      - review_market_summary
+    inputs:
+      reviewed_summary: \${steps.review_market_summary.output}
+    prompt: prompts/generate_spec.md
+    outputs:
+      - artifact: product_spec
+        file: product_spec.md
+    acceptance:
+      mode: mixed
+      criteria:
+        - Spec is actionable for engineering
+        - Scope and assumptions are explicit`;
+    }
+
+    function drawEdges() {
+      const canvasBox = canvas.getBoundingClientRect();
+      const edgePairs = [
+        ["summarize_market", "review_market_summary", false],
+        ["review_market_summary", "generate_spec", true]
+      ];
+
+      edgeLayer.setAttribute("viewBox", `0 0 ${canvasBox.width} ${canvasBox.height}`);
+      edgeLayer.innerHTML = "";
+
+      edgePairs.forEach(([from, to, pending]) => {
+        const fromNode = document.querySelector(`[data-step="${from}"]`);
+        const toNode = document.querySelector(`[data-step="${to}"]`);
+        const fromBox = fromNode.getBoundingClientRect();
+        const toBox = toNode.getBoundingClientRect();
+
+        const x1 = fromBox.right - canvasBox.left - 4;
+        const y1 = fromBox.top - canvasBox.top + fromBox.height * 0.56;
+        const x2 = toBox.left - canvasBox.left + 4;
+        const y2 = toBox.top - canvasBox.top + toBox.height * 0.43;
+        const mid = Math.max(56, Math.abs(x2 - x1) * 0.5);
+
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", `M ${x1} ${y1} C ${x1 + mid} ${y1}, ${x2 - mid} ${y2}, ${x2} ${y2}`);
+        if (pending) path.setAttribute("class", "pending");
+        edgeLayer.appendChild(path);
+      });
+    }
+
+    function persistActiveFields() {
+      const step = steps[activeStepId];
+      step.title = stepName.value.trim() || step.title;
+      step.type = stepType.value;
+      step.prompt = promptBox.value;
+      step.inputs = inputsBox.value;
+      step.artifact = artifactBox.value;
+      step.rejectBehavior = rejectBehavior.value;
+      renderYaml();
+    }
+
+    document.querySelectorAll(".tab").forEach(tab => {
+      tab.addEventListener("click", () => {
+        document.querySelectorAll(".tab").forEach(item => item.classList.remove("active"));
+        document.querySelectorAll(".tab-panel").forEach(panel => panel.classList.remove("active"));
+        tab.classList.add("active");
+        document.getElementById(`${tab.dataset.tab}Panel`).classList.add("active");
+      });
+    });
+
+    nodes.forEach(node => {
+      node.addEventListener("click", () => selectStep(node.dataset.step));
+
+      const header = node.querySelector(".node-header");
+      header.addEventListener("pointerdown", event => {
+        event.preventDefault();
+        node.setPointerCapture(event.pointerId);
+        node.classList.add("dragging");
+
+        const startX = event.clientX;
+        const startY = event.clientY;
+        const startLeft = parseFloat(node.style.left);
+        const startTop = parseFloat(node.style.top);
+
+        function move(moveEvent) {
+          const canvasBox = canvas.getBoundingClientRect();
+          const nextLeft = Math.max(12, Math.min(canvasBox.width - node.offsetWidth - 12, startLeft + moveEvent.clientX - startX));
+          const nextTop = Math.max(12, Math.min(canvasBox.height - node.offsetHeight - 12, startTop + moveEvent.clientY - startY));
+          node.style.left = `${nextLeft}px`;
+          node.style.top = `${nextTop}px`;
+          drawEdges();
+        }
+
+        function stop() {
+          node.classList.remove("dragging");
+          node.removeEventListener("pointermove", move);
+          node.removeEventListener("pointerup", stop);
+          node.removeEventListener("pointercancel", stop);
+        }
+
+        node.addEventListener("pointermove", move);
+        node.addEventListener("pointerup", stop);
+        node.addEventListener("pointercancel", stop);
+      });
+    });
+
+    [stepName, stepType, promptBox, inputsBox, artifactBox, rejectBehavior].forEach(control => {
+      control.addEventListener("input", persistActiveFields);
+      control.addEventListener("change", persistActiveFields);
+    });
+
+    document.querySelectorAll(".chip").forEach(chip => {
+      chip.addEventListener("click", () => chip.classList.toggle("active"));
+    });
+
+    window.addEventListener("resize", drawEdges);
+    selectStep(activeStepId);
+    requestAnimationFrame(drawEdges);
+  </script>
+</body>
+</html>
