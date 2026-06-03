@@ -1,0 +1,101 @@
+# Workflow Software
+
+UI-first, YAML-backed workflow builder for designing and running Codex-powered workflows.
+
+Users compose workflows in a visual UI. The UI produces canonical YAML, publishes immutable workflow versions, and runs published versions through a separate worker service.
+
+## Project Structure
+
+```text
+workflow_software/
+  ui/       Next.js frontend. Calls worker REST APIs only.
+  worker/   Backend API, runtime worker, Prisma, Codex SDK, artifacts, worktrees.
+  shared/   Zod schemas, shared types, constants, and YAML helpers.
+  infra/    Local infrastructure and environment examples.
+  docs/     Architecture notes and example workflow YAML.
+  data/     Gitignored runtime artifacts, worktrees, and exports.
+```
+
+## Core Decisions
+
+- Package manager: pnpm workspace.
+- UI: Next.js + React Flow / xyflow.
+- Worker: TypeScript service with REST API and Postgres polling.
+- Runtime agent: `@openai/codex-sdk`.
+- Database: PostgreSQL with Prisma owned by `worker/`.
+- Shared contracts: Zod schemas in `shared/`.
+- Formal artifacts: written by the worker under `data/artifacts/`.
+- Source code changes: made in dedicated git worktrees under `data/worktrees/`.
+
+## Setup
+
+Install dependencies:
+
+```bash
+pnpm install
+```
+
+Start local PostgreSQL:
+
+```bash
+docker compose -f infra/docker-compose.yml up -d
+```
+
+Copy environment examples:
+
+```bash
+cp infra/env/worker.env.example worker/.env
+cp infra/env/ui.env.example ui/.env.local
+```
+
+Generate Prisma client and run migrations when migrations are added:
+
+```bash
+pnpm --filter @workflow-software/worker prisma:generate
+pnpm --filter @workflow-software/worker prisma:migrate
+```
+
+## Development
+
+Run the UI:
+
+```bash
+pnpm dev:ui
+```
+
+Run the worker API and poller:
+
+```bash
+pnpm dev:worker
+```
+
+Build all packages:
+
+```bash
+pnpm build
+```
+
+Typecheck all packages:
+
+```bash
+pnpm typecheck
+```
+
+## Runtime Rules
+
+- Draft workflows are editable.
+- Published workflow versions are immutable.
+- Run button executes published versions only.
+- Each node has at most one upstream node and one downstream node.
+- Each step can consume multiple artifact inputs and produce multiple artifacts.
+- Artifacts are immutable; reruns create new versions.
+- Downstream step runs record the exact artifact versions they consumed.
+- Optional context paths are worktree-relative and skipped when missing or inaccessible.
+- Codex does not write the artifact store directly; the worker persists formal artifacts.
+
+## Useful Files
+
+- `docs/architecture/folder-structure.md`
+- `docs/examples/workflow.yaml`
+- `worker/prisma/schema.prisma`
+- `plan.md`
