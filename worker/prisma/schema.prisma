@@ -50,6 +50,7 @@ enum DecisionVerdict {
 
 model Workflow {
   id        String            @id @default(cuid())
+  /// Read projection of draftYaml.name. Update only with draftYaml.
   name      String
   draftYaml String            @db.Text
   createdAt DateTime          @default(now())
@@ -60,14 +61,15 @@ model Workflow {
 model WorkflowVersion {
   id           String        @id @default(cuid())
   workflowId   String
-  version      Int
+  /// Monotonic publish sequence. The workflow's semantic version lives in yamlSnapshot.
+  revision     Int
   yamlSnapshot String        @db.Text
   contentHash  String
   publishedAt  DateTime      @default(now())
   workflow     Workflow      @relation(fields: [workflowId], references: [id])
   runs         WorkflowRun[]
 
-  @@unique([workflowId, version])
+  @@unique([workflowId, revision])
 }
 
 model WorkflowRun {

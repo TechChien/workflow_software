@@ -27,6 +27,15 @@ workflow_software/
 - Formal artifacts: written by the worker under `data/artifacts/`.
 - Source code changes: made in dedicated git worktrees under `data/worktrees/`.
 
+## Sources of Truth
+
+- Workflow definitions come only from canonical YAML.
+- `Workflow.draftYaml` is the editable definition; `Workflow.name` is a read projection derived from it.
+- `WorkflowVersion.yamlSnapshot` is the immutable definition used by every run.
+- `WorkflowVersion.revision` is a publish sequence; the workflow's semantic `version` remains inside YAML.
+- PostgreSQL is authoritative for runtime state, execution history, decisions, and lineage.
+- Artifact contents live in the artifact store, while source code contents live in Git worktrees.
+
 ## Setup
 
 Install dependencies:
@@ -86,8 +95,10 @@ pnpm typecheck
 - Draft workflows are editable.
 - Published workflow versions are immutable.
 - Run button executes published versions only.
+- Workers verify and parse the published YAML snapshot instead of reconstructing definitions from runtime rows.
 - Each node has at most one upstream node and one downstream node.
 - Each step can consume multiple artifact inputs and produce multiple artifacts.
+- Each step can define multiple acceptance criteria.
 - Artifacts are immutable; reruns create new versions.
 - Downstream step runs record the exact artifact versions they consumed.
 - Optional context paths are worktree-relative and skipped when missing or inaccessible.

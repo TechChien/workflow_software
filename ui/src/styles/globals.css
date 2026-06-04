@@ -114,6 +114,17 @@ button.primary {
   margin-bottom: 10px;
 }
 
+.panel fieldset {
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.panel legend {
+  padding: 0 4px;
+}
+
 .panel input,
 .panel select,
 .panel textarea {

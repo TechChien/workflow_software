@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { CreateRunRequestSchema } from "@workflow-software/shared";
+import { prisma } from "../../db/prisma.js";
 import { createWorkflowRun } from "../../runtime/run-service.js";
 
 export async function registerRunRoutes(app: FastifyInstance) {
@@ -10,8 +11,14 @@ export async function registerRunRoutes(app: FastifyInstance) {
     return reply.code(201).send(run);
   });
 
-  app.get("/:runId", async (request) => ({
-    id: (request.params as { runId: string }).runId,
-    status: "pending"
-  }));
+  app.get("/:runId", async (request) =>
+    prisma.workflowRun.findUniqueOrThrow({
+      where: {
+        id: (request.params as { runId: string }).runId
+      },
+      include: {
+        stepRuns: true
+      }
+    })
+  );
 }

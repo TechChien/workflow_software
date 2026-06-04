@@ -13,6 +13,11 @@ export const ContextPathSchema = z.object({
   optional: z.boolean().default(true)
 });
 
+export const AcceptanceCriteriaSchema = z
+  .union([z.string(), z.array(z.string().min(1))])
+  .transform((criteria) => (typeof criteria === "string" ? (criteria ? [criteria] : []) : criteria))
+  .default([]);
+
 export const StepDefinitionSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1).optional(),
@@ -26,9 +31,9 @@ export const StepDefinitionSchema = z.object({
   prompt: z.string().default(""),
   acceptance: z
     .object({
-      criteria: z.string().default("")
+      criteria: AcceptanceCriteriaSchema
     })
-    .default({ criteria: "" })
+    .default({ criteria: [] })
 });
 
 export type StepArtifactInput = z.infer<typeof StepArtifactInputSchema>;

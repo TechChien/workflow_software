@@ -1,0 +1,311 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="3260" height="1280" viewBox="0 0 3260 1280" role="img" aria-labelledby="title desc">
+  <title id="title">Workflow Software Database Table Relationships</title>
+  <desc id="desc">Entity relationship diagram for the 13 Prisma models and their 16 enforced foreign-key relationships.</desc>
+
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#0f172a" flood-opacity="0.12"/>
+    </filter>
+    <marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L9,4.5 L0,9 Z" fill="#64748b"/>
+    </marker>
+    <style>
+      .canvas { fill: #f8fafc; }
+      .title { fill: #0f172a; font: 700 28px "Segoe UI", Arial, sans-serif; }
+      .subtitle { fill: #475569; font: 14px "Segoe UI", Arial, sans-serif; }
+      .legend { fill: #334155; font: 600 13px "Segoe UI", Arial, sans-serif; }
+      .card-body { fill: #ffffff; stroke: #cbd5e1; stroke-width: 1.5; }
+      .header-core { fill: #1d4ed8; }
+      .header-run { fill: #0f766e; }
+      .header-step { fill: #6d28d9; }
+      .header-artifact { fill: #c2410c; }
+      .header-event { fill: #be185d; }
+      .header-code { fill: #15803d; }
+      .table-title { fill: #ffffff; font: 700 17px "Segoe UI", Arial, sans-serif; dominant-baseline: middle; }
+      .field { fill: #1e293b; font: 600 13px Consolas, "Courier New", monospace; dominant-baseline: middle; }
+      .type { fill: #64748b; font: 12px Consolas, "Courier New", monospace; dominant-baseline: middle; }
+      .tag { font: 700 10px "Segoe UI", Arial, sans-serif; dominant-baseline: middle; }
+      .pk { fill: #b45309; }
+      .fk { fill: #1d4ed8; }
+      .ref { fill: #7e22ce; }
+      .edge { fill: none; stroke: #64748b; stroke-width: 2; marker-end: url(#arrow); }
+      .edge-label { fill: #475569; font: 600 11px Consolas, "Courier New", monospace; paint-order: stroke; stroke: #f8fafc; stroke-width: 7px; stroke-linejoin: round; }
+      .edge-cardinality { fill: #64748b; font: 700 10px "Segoe UI", Arial, sans-serif; paint-order: stroke; stroke: #f8fafc; stroke-width: 6px; }
+      .section-label { fill: #64748b; font: 700 12px "Segoe UI", Arial, sans-serif; letter-spacing: 1.5px; }
+    </style>
+  </defs>
+
+  <rect class="canvas" width="3260" height="1280"/>
+
+  <text class="title" x="40" y="42">Workflow Software Database Relationships</text>
+  <text class="subtitle" x="40" y="68">Physical columns and enforced Prisma @relation foreign keys</text>
+  <text class="legend" x="2400" y="38">PK = primary key</text>
+  <text class="legend" x="2400" y="58">FK = enforced foreign key</text>
+  <text class="legend" x="2600" y="38">REF = logical reference, not a foreign key</text>
+  <text class="legend" x="2600" y="58">Arrow = parent 1 to child N</text>
+  <text class="subtitle" x="2880" y="38">Prisma virtual relation arrays are omitted.</text>
+
+  <text class="section-label" x="40" y="116">WORKFLOW DEFINITION</text>
+  <text class="section-label" x="960" y="76">RUNTIME</text>
+  <text class="section-label" x="500" y="596">ARTIFACTS</text>
+  <text class="section-label" x="1420" y="456">EVENTS AND INTERACTIONS</text>
+  <text class="section-label" x="1420" y="876">CODE CHANGES</text>
+
+  <!-- Enforced foreign-key relationships. -->
+  <g id="relationships">
+    <path class="edge" d="M440 220 H500"/>
+    <text class="edge-label" x="452" y="208">workflowId</text>
+    <text class="edge-cardinality" x="446" y="235">1:N</text>
+
+    <path class="edge" d="M900 220 H930 V200 H960"/>
+    <text class="edge-label" x="904" y="208">workflowVersionId</text>
+    <text class="edge-cardinality" x="914" y="235">1:N</text>
+
+    <path class="edge" d="M1160 348 V480"/>
+    <text class="edge-label" x="1172" y="417">workflowRunId</text>
+    <text class="edge-cardinality" x="1169" y="464">1:N</text>
+
+    <path class="edge" d="M960 300 H930 V590 H700 V620"/>
+    <text class="edge-label" x="744" y="580">workflowRunId</text>
+    <text class="edge-cardinality" x="708" y="611">1:N</text>
+
+    <path class="edge" d="M1360 250 H1390 V520 H1420"/>
+    <text class="edge-label" x="1398" y="506">workflowRunId</text>
+    <text class="edge-cardinality" x="1396" y="536">1:N</text>
+
+    <path class="edge" d="M1160 100 V88 H2080 V100"/>
+    <text class="edge-label" x="1638" y="80">workflowRunId</text>
+    <text class="edge-cardinality" x="2058" y="93">1:N</text>
+
+    <path class="edge" d="M1360 300 H1420"/>
+    <text class="edge-label" x="1367" y="288">workflowRunId</text>
+    <text class="edge-cardinality" x="1382" y="315">1:N</text>
+
+    <path class="edge" d="M960 840 H930 V980 H240 V912"/>
+    <text class="edge-label" x="568" y="971">stepRunId</text>
+    <text class="edge-cardinality" x="250" y="928">1:N</text>
+
+    <path class="edge" d="M500 830 H440"/>
+    <text class="edge-label" x="446" y="818">artifactVersionId</text>
+    <text class="edge-cardinality" x="456" y="845">1:N</text>
+
+    <path class="edge" d="M960 760 H900"/>
+    <text class="edge-label" x="892" y="748">producerStepRunId</text>
+    <text class="edge-cardinality" x="918" y="775">1:N</text>
+
+    <path class="edge" d="M1360 640 H1420"/>
+    <text class="edge-label" x="1372" y="628">stepRunId</text>
+    <text class="edge-cardinality" x="1382" y="655">1:N</text>
+
+    <path class="edge" d="M1360 680 H1380 V450 H2080 V480"/>
+    <text class="edge-label" x="1702" y="442">stepRunId</text>
+    <text class="edge-cardinality" x="2058" y="474">1:N</text>
+
+    <path class="edge" d="M1360 710 H1370 V430 H2540 V480"/>
+    <text class="edge-label" x="2244" y="422">stepRunId</text>
+    <text class="edge-cardinality" x="2518" y="474">1:N</text>
+
+    <path class="edge" d="M1360 740 H1365 V410 H3000 V480"/>
+    <text class="edge-label" x="2704" y="402">stepRunId</text>
+    <text class="edge-cardinality" x="2978" y="474">1:N</text>
+
+    <path class="edge" d="M1260 920 V1035 H1420"/>
+    <text class="edge-label" x="1301" y="1025">stepRunId</text>
+    <text class="edge-cardinality" x="1383" y="1050">1:N</text>
+
+    <path class="edge" d="M1820 260 H1850 V850 H1800 V900"/>
+    <text class="edge-label" x="1810" y="842">codeWorkspaceId</text>
+    <text class="edge-cardinality" x="1808" y="890">1:N</text>
+  </g>
+
+  <!-- Workflow -->
+  <g transform="translate(40 140)" filter="url(#shadow)">
+    <rect class="card-body" width="400" height="176" rx="10"/>
+    <path class="header-core" d="M10 0 H390 Q400 0 400 10 V48 H0 V10 Q0 0 10 0 Z"/>
+    <text class="table-title" x="18" y="25">Workflow</text>
+    <text class="tag pk" x="16" y="62">PK</text><text class="field" x="58" y="62">id</text><text class="type" x="275" y="62">String</text>
+    <text class="field" x="58" y="86">name</text><text class="type" x="275" y="86">String</text>
+    <text class="field" x="58" y="110">draftYaml</text><text class="type" x="275" y="110">String (Text)</text>
+    <text class="field" x="58" y="134">createdAt</text><text class="type" x="275" y="134">DateTime</text>
+    <text class="field" x="58" y="158">updatedAt</text><text class="type" x="275" y="158">DateTime</text>
+  </g>
+
+  <!-- WorkflowVersion -->
+  <g transform="translate(500 130)" filter="url(#shadow)">
+    <rect class="card-body" width="400" height="200" rx="10"/>
+    <path class="header-core" d="M10 0 H390 Q400 0 400 10 V48 H0 V10 Q0 0 10 0 Z"/>
+    <text class="table-title" x="18" y="25">WorkflowVersion</text>
+    <text class="tag pk" x="16" y="62">PK</text><text class="field" x="58" y="62">id</text><text class="type" x="275" y="62">String</text>
+    <text class="tag fk" x="16" y="86">FK</text><text class="field" x="58" y="86">workflowId</text><text class="type" x="275" y="86">String</text>
+    <text class="field" x="58" y="110">revision</text><text class="type" x="275" y="110">Int</text>
+    <text class="field" x="58" y="134">yamlSnapshot</text><text class="type" x="275" y="134">String (Text)</text>
+    <text class="field" x="58" y="158">contentHash</text><text class="type" x="275" y="158">String</text>
+    <text class="field" x="58" y="182">publishedAt</text><text class="type" x="275" y="182">DateTime</text>
+  </g>
+
+  <!-- WorkflowRun -->
+  <g transform="translate(960 100)" filter="url(#shadow)">
+    <rect class="card-body" width="400" height="248" rx="10"/>
+    <path class="header-run" d="M10 0 H390 Q400 0 400 10 V48 H0 V10 Q0 0 10 0 Z"/>
+    <text class="table-title" x="18" y="25">WorkflowRun</text>
+    <text class="tag pk" x="16" y="62">PK</text><text class="field" x="58" y="62">id</text><text class="type" x="275" y="62">String</text>
+    <text class="tag fk" x="16" y="86">FK</text><text class="field" x="58" y="86">workflowVersionId</text><text class="type" x="275" y="86">String</text>
+    <text class="field" x="58" y="110">status</text><text class="type" x="275" y="110">WorkflowRunStatus</text>
+    <text class="field" x="58" y="134">triggerType</text><text class="type" x="275" y="134">String</text>
+    <text class="field" x="58" y="158">inputPayload</text><text class="type" x="275" y="158">Json</text>
+    <text class="field" x="58" y="182">createdAt</text><text class="type" x="275" y="182">DateTime</text>
+    <text class="field" x="58" y="206">startedAt</text><text class="type" x="275" y="206">DateTime?</text>
+    <text class="field" x="58" y="230">completedAt</text><text class="type" x="275" y="230">DateTime?</text>
+  </g>
+
+  <!-- CodeWorkspace -->
+  <g transform="translate(1420 100)" filter="url(#shadow)">
+    <rect class="card-body" width="400" height="224" rx="10"/>
+    <path class="header-code" d="M10 0 H390 Q400 0 400 10 V48 H0 V10 Q0 0 10 0 Z"/>
+    <text class="table-title" x="18" y="25">CodeWorkspace</text>
+    <text class="tag pk" x="16" y="62">PK</text><text class="field" x="58" y="62">id</text><text class="type" x="275" y="62">String</text>
+    <text class="tag fk" x="16" y="86">FK</text><text class="field" x="58" y="86">workflowRunId</text><text class="type" x="275" y="86">String</text>
+    <text class="field" x="58" y="110">repoPath</text><text class="type" x="275" y="110">String</text>
+    <text class="field" x="58" y="134">baseRef</text><text class="type" x="275" y="134">String</text>
+    <text class="field" x="58" y="158">worktreePath</text><text class="type" x="275" y="158">String</text>
+    <text class="field" x="58" y="182">baseCommit</text><text class="type" x="275" y="182">String</text>
+    <text class="field" x="58" y="206">createdAt</text><text class="type" x="275" y="206">DateTime</text>
+  </g>
+
+  <!-- RunEvent -->
+  <g transform="translate(1880 100)" filter="url(#shadow)">
+    <rect class="card-body" width="400" height="176" rx="10"/>
+    <path class="header-event" d="M10 0 H390 Q400 0 400 10 V48 H0 V10 Q0 0 10 0 Z"/>
+    <text class="table-title" x="18" y="25">RunEvent</text>
+    <text class="tag pk" x="16" y="62">PK</text><text class="field" x="58" y="62">id</text><text class="type" x="275" y="62">String</text>
+    <text class="tag fk" x="16" y="86">FK</text><text class="field" x="58" y="86">workflowRunId</text><text class="type" x="275" y="86">String</text>
+    <text class="field" x="58" y="110">eventType</text><text class="type" x="275" y="110">String</text>
+    <text class="field" x="58" y="134">payload</text><text class="type" x="275" y="134">Json</text>
+    <text class="field" x="58" y="158">createdAt</text><text class="type" x="275" y="158">DateTime</text>
+  </g>
+
+  <!-- StepRun -->
+  <g transform="translate(960 480)" filter="url(#shadow)">
+    <rect class="card-body" width="400" height="440" rx="10"/>
+    <path class="header-step" d="M10 0 H390 Q400 0 400 10 V48 H0 V10 Q0 0 10 0 Z"/>
+    <text class="table-title" x="18" y="25">StepRun</text>
+    <text class="tag pk" x="16" y="62">PK</text><text class="field" x="58" y="62">id</text><text class="type" x="275" y="62">String</text>
+    <text class="tag fk" x="16" y="86">FK</text><text class="field" x="58" y="86">workflowRunId</text><text class="type" x="275" y="86">String</text>
+    <text class="tag ref" x="16" y="110">REF</text><text class="field" x="58" y="110">stepId</text><text class="type" x="275" y="110">String</text>
+    <text class="field" x="58" y="134">attempt</text><text class="type" x="275" y="134">Int</text>
+    <text class="field" x="58" y="158">status</text><text class="type" x="275" y="158">StepRunStatus</text>
+    <text class="tag ref" x="16" y="182">REF</text><text class="field" x="58" y="182">upstreamStepRunId</text><text class="type" x="275" y="182">String?</text>
+    <text class="tag ref" x="16" y="206">REF</text><text class="field" x="58" y="206">downstreamStepRunId</text><text class="type" x="275" y="206">String?</text>
+    <text class="tag ref" x="16" y="230">REF</text><text class="field" x="58" y="230">codexThreadId</text><text class="type" x="275" y="230">String?</text>
+    <text class="tag ref" x="16" y="254">REF</text><text class="field" x="58" y="254">codeWorkspaceId</text><text class="type" x="275" y="254">String?</text>
+    <text class="field" x="58" y="278">beforeCommit</text><text class="type" x="275" y="278">String?</text>
+    <text class="field" x="58" y="302">afterCommit</text><text class="type" x="275" y="302">String?</text>
+    <text class="field" x="58" y="326">requiresCodeReview</text><text class="type" x="275" y="326">Boolean</text>
+    <text class="field" x="58" y="350">staleReason</text><text class="type" x="275" y="350">String?</text>
+    <text class="field" x="58" y="374">createdAt</text><text class="type" x="275" y="374">DateTime</text>
+    <text class="field" x="58" y="398">startedAt</text><text class="type" x="275" y="398">DateTime?</text>
+    <text class="field" x="58" y="422">completedAt</text><text class="type" x="275" y="422">DateTime?</text>
+  </g>
+
+  <!-- ArtifactVersion -->
+  <g transform="translate(500 620)" filter="url(#shadow)">
+    <rect class="card-body" width="400" height="320" rx="10"/>
+    <path class="header-artifact" d="M10 0 H390 Q400 0 400 10 V48 H0 V10 Q0 0 10 0 Z"/>
+    <text class="table-title" x="18" y="25">ArtifactVersion</text>
+    <text class="tag pk" x="16" y="62">PK</text><text class="field" x="58" y="62">id</text><text class="type" x="275" y="62">String</text>
+    <text class="tag fk" x="16" y="86">FK</text><text class="field" x="58" y="86">workflowRunId</text><text class="type" x="275" y="86">String</text>
+    <text class="field" x="58" y="110">artifactKey</text><text class="type" x="275" y="110">String</text>
+    <text class="field" x="58" y="134">version</text><text class="type" x="275" y="134">Int</text>
+    <text class="tag fk" x="16" y="158">FK</text><text class="field" x="58" y="158">producerStepRunId</text><text class="type" x="275" y="158">String</text>
+    <text class="tag ref" x="16" y="182">REF</text><text class="field" x="58" y="182">parentVersionId</text><text class="type" x="275" y="182">String?</text>
+    <text class="field" x="58" y="206">status</text><text class="type" x="275" y="206">ArtifactStatus</text>
+    <text class="field" x="58" y="230">contentUri</text><text class="type" x="275" y="230">String</text>
+    <text class="field" x="58" y="254">contentHash</text><text class="type" x="275" y="254">String</text>
+    <text class="field" x="58" y="278">createdAt</text><text class="type" x="275" y="278">DateTime</text>
+    <text class="field" x="58" y="302">acceptedAt</text><text class="type" x="275" y="302">DateTime?</text>
+  </g>
+
+  <!-- StepRunArtifactInput -->
+  <g transform="translate(40 760)" filter="url(#shadow)">
+    <rect class="card-body" width="400" height="152" rx="10"/>
+    <path class="header-artifact" d="M10 0 H390 Q400 0 400 10 V48 H0 V10 Q0 0 10 0 Z"/>
+    <text class="table-title" x="18" y="25">StepRunArtifactInput</text>
+    <text class="tag pk" x="16" y="62">PK</text><text class="field" x="58" y="62">id</text><text class="type" x="275" y="62">String</text>
+    <text class="tag fk" x="16" y="86">FK</text><text class="field" x="58" y="86">stepRunId</text><text class="type" x="275" y="86">String</text>
+    <text class="field" x="58" y="110">artifactKey</text><text class="type" x="275" y="110">String</text>
+    <text class="tag fk" x="16" y="134">FK</text><text class="field" x="58" y="134">artifactVersionId</text><text class="type" x="275" y="134">String</text>
+  </g>
+
+  <!-- DecisionEvent -->
+  <g transform="translate(1420 480)" filter="url(#shadow)">
+    <rect class="card-body" width="400" height="248" rx="10"/>
+    <path class="header-event" d="M10 0 H390 Q400 0 400 10 V48 H0 V10 Q0 0 10 0 Z"/>
+    <text class="table-title" x="18" y="25">DecisionEvent</text>
+    <text class="tag pk" x="16" y="62">PK</text><text class="field" x="58" y="62">id</text><text class="type" x="275" y="62">String</text>
+    <text class="tag fk" x="16" y="86">FK</text><text class="field" x="58" y="86">workflowRunId</text><text class="type" x="275" y="86">String</text>
+    <text class="tag fk" x="16" y="110">FK</text><text class="field" x="58" y="110">stepRunId</text><text class="type" x="275" y="110">String</text>
+    <text class="field" x="58" y="134">source</text><text class="type" x="275" y="134">DecisionSource</text>
+    <text class="field" x="58" y="158">verdict</text><text class="type" x="275" y="158">DecisionVerdict</text>
+    <text class="field" x="58" y="182">comment</text><text class="type" x="275" y="182">String?</text>
+    <text class="tag ref" x="16" y="206">REF</text><text class="field" x="58" y="206">targetStepId</text><text class="type" x="275" y="206">String?</text>
+    <text class="field" x="58" y="230">createdAt</text><text class="type" x="275" y="230">DateTime</text>
+  </g>
+
+  <!-- CodexInteractionEvent -->
+  <g transform="translate(1880 480)" filter="url(#shadow)">
+    <rect class="card-body" width="400" height="224" rx="10"/>
+    <path class="header-event" d="M10 0 H390 Q400 0 400 10 V48 H0 V10 Q0 0 10 0 Z"/>
+    <text class="table-title" x="18" y="25">CodexInteractionEvent</text>
+    <text class="tag pk" x="16" y="62">PK</text><text class="field" x="58" y="62">id</text><text class="type" x="275" y="62">String</text>
+    <text class="tag fk" x="16" y="86">FK</text><text class="field" x="58" y="86">stepRunId</text><text class="type" x="275" y="86">String</text>
+    <text class="field" x="58" y="110">kind</text><text class="type" x="275" y="110">String</text>
+    <text class="field" x="58" y="134">prompt</text><text class="type" x="275" y="134">String (Text)</text>
+    <text class="field" x="58" y="158">status</text><text class="type" x="275" y="158">String</text>
+    <text class="field" x="58" y="182">payload</text><text class="type" x="275" y="182">Json</text>
+    <text class="field" x="58" y="206">createdAt</text><text class="type" x="275" y="206">DateTime</text>
+  </g>
+
+  <!-- ContextPathEvent -->
+  <g transform="translate(2340 480)" filter="url(#shadow)">
+    <rect class="card-body" width="400" height="224" rx="10"/>
+    <path class="header-event" d="M10 0 H390 Q400 0 400 10 V48 H0 V10 Q0 0 10 0 Z"/>
+    <text class="table-title" x="18" y="25">ContextPathEvent</text>
+    <text class="tag pk" x="16" y="62">PK</text><text class="field" x="58" y="62">id</text><text class="type" x="275" y="62">String</text>
+    <text class="tag fk" x="16" y="86">FK</text><text class="field" x="58" y="86">stepRunId</text><text class="type" x="275" y="86">String</text>
+    <text class="field" x="58" y="110">path</text><text class="type" x="275" y="110">String</text>
+    <text class="field" x="58" y="134">type</text><text class="type" x="275" y="134">String</text>
+    <text class="field" x="58" y="158">status</text><text class="type" x="275" y="158">String</text>
+    <text class="field" x="58" y="182">reason</text><text class="type" x="275" y="182">String?</text>
+    <text class="field" x="58" y="206">createdAt</text><text class="type" x="275" y="206">DateTime</text>
+  </g>
+
+  <!-- ToolInvocation -->
+  <g transform="translate(2800 480)" filter="url(#shadow)">
+    <rect class="card-body" width="400" height="224" rx="10"/>
+    <path class="header-event" d="M10 0 H390 Q400 0 400 10 V48 H0 V10 Q0 0 10 0 Z"/>
+    <text class="table-title" x="18" y="25">ToolInvocation</text>
+    <text class="tag pk" x="16" y="62">PK</text><text class="field" x="58" y="62">id</text><text class="type" x="275" y="62">String</text>
+    <text class="tag fk" x="16" y="86">FK</text><text class="field" x="58" y="86">stepRunId</text><text class="type" x="275" y="86">String</text>
+    <text class="field" x="58" y="110">toolName</text><text class="type" x="275" y="110">String</text>
+    <text class="field" x="58" y="134">status</text><text class="type" x="275" y="134">String</text>
+    <text class="field" x="58" y="158">argumentsRedacted</text><text class="type" x="275" y="158">Json</text>
+    <text class="tag ref" x="16" y="182">REF</text><text class="field" x="58" y="182">resultRef</text><text class="type" x="275" y="182">String?</text>
+    <text class="field" x="58" y="206">createdAt</text><text class="type" x="275" y="206">DateTime</text>
+  </g>
+
+  <!-- CodeChangeRecord -->
+  <g transform="translate(1420 900)" filter="url(#shadow)">
+    <rect class="card-body" width="400" height="272" rx="10"/>
+    <path class="header-code" d="M10 0 H390 Q400 0 400 10 V48 H0 V10 Q0 0 10 0 Z"/>
+    <text class="table-title" x="18" y="25">CodeChangeRecord</text>
+    <text class="tag pk" x="16" y="62">PK</text><text class="field" x="58" y="62">id</text><text class="type" x="275" y="62">String</text>
+    <text class="tag fk" x="16" y="86">FK</text><text class="field" x="58" y="86">stepRunId</text><text class="type" x="275" y="86">String</text>
+    <text class="tag fk" x="16" y="110">FK</text><text class="field" x="58" y="110">codeWorkspaceId</text><text class="type" x="275" y="110">String</text>
+    <text class="field" x="58" y="134">beforeCommit</text><text class="type" x="275" y="134">String</text>
+    <text class="field" x="58" y="158">afterCommit</text><text class="type" x="275" y="158">String?</text>
+    <text class="field" x="58" y="182">diffUri</text><text class="type" x="275" y="182">String?</text>
+    <text class="field" x="58" y="206">diffHash</text><text class="type" x="275" y="206">String?</text>
+    <text class="field" x="58" y="230">status</text><text class="type" x="275" y="230">String</text>
+    <text class="field" x="58" y="254">createdAt</text><text class="type" x="275" y="254">DateTime</text>
+  </g>
+</svg>

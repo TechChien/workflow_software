@@ -18,10 +18,17 @@ export function StepInspector() {
         Context paths
         <textarea value={"src\ndocs/domain-rules.md"} readOnly />
       </label>
-      <label>
-        Acceptance criteria
-        <textarea value="Every codebase claim must cite file and line evidence." readOnly />
-      </label>
+      <fieldset>
+        <legend>Acceptance criteria</legend>
+        <label>
+          Criterion 1
+          <textarea value="Every codebase claim must cite file and line evidence." readOnly />
+        </label>
+        <label>
+          Criterion 2
+          <textarea value="Each identified gap explains its impact." readOnly />
+        </label>
+      </fieldset>
     </section>
   );
 }

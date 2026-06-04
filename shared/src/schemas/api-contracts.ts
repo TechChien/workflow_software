@@ -2,7 +2,6 @@ import { z } from "zod";
 import { WorkflowYamlSchema } from "./workflow-yaml.js";
 
 export const CreateWorkflowRequestSchema = z.object({
-  name: z.string().min(1),
   draftYaml: WorkflowYamlSchema
 });
 

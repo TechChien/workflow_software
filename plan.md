@@ -69,8 +69,9 @@ steps:
       Produce the requested output artifacts.
 
     acceptance:
-      criteria: |
-        Every codebase claim must cite file and line evidence.
+      criteria:
+        - Every codebase claim must cite file and line evidence.
+        - Each identified gap explains its impact.
 ```
 
 - `upstream/downstream` express node connection only。

@@ -12,3 +12,6 @@ data/    Gitignored runtime artifacts, worktrees, and exports.
 
 The UI does not import Prisma or access PostgreSQL directly. The worker owns runtime
 state, persistence, Codex execution, and artifact writing.
+
+Canonical YAML is the source of truth for workflow definitions. PostgreSQL stores the
+editable draft, immutable published snapshots, and authoritative runtime state.

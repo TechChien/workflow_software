@@ -14,12 +14,20 @@ steps:
     output_artifacts:
       - artifact: g1_requirements
         filename: requirements.md
+    acceptance:
+      criteria:
+        - No implementation-layer details.
+        - Every requirement is traceable to the original request.
   - id: g2_gap_analysis
     type: code_agent
     upstream: g1_intent_freeze
     output_artifacts:
       - artifact: g2_gap_summary
         filename: g2-gap-summary.md
+    acceptance:
+      criteria:
+        - Every codebase claim must cite file and line evidence.
+        - Each identified gap explains its impact.
 `;
 
 export default function HomePage() {

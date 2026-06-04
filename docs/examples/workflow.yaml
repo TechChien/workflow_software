@@ -17,8 +17,9 @@ steps:
     prompt: |
       Convert the original request into intent-layer requirements.
     acceptance:
-      criteria: |
-        No implementation-layer details.
+      criteria:
+        - No implementation-layer details.
+        - Every requirement is traceable to the original request.
 
   - id: g2_gap_analysis
     type: code_agent
@@ -39,5 +40,6 @@ steps:
     prompt: |
       Inspect the accepted artifact inputs and optional worktree-relative context.
     acceptance:
-      criteria: |
-        Every codebase claim must cite file and line evidence.
+      criteria:
+        - Every codebase claim must cite file and line evidence.
+        - Each identified gap explains its impact.
