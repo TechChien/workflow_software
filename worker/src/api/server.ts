@@ -1,6 +1,5 @@
 import Fastify from "fastify";
 import { registerArtifactRoutes } from "./routes/artifacts.js";
-import { registerCodexInteractionRoutes } from "./routes/codex-interactions.js";
 import { registerHumanDecisionRoutes } from "./routes/human-decisions.js";
 import { registerRunRoutes } from "./routes/runs.js";
 import { registerWorkflowVersionRoutes } from "./routes/workflow-versions.js";
@@ -15,7 +14,6 @@ export async function buildServer() {
   await app.register(registerWorkflowVersionRoutes, { prefix: "/api/workflow-versions" });
   await app.register(registerRunRoutes, { prefix: "/api/runs" });
   await app.register(registerHumanDecisionRoutes, { prefix: "/api/human-decisions" });
-  await app.register(registerCodexInteractionRoutes, { prefix: "/api/codex-interactions" });
   await app.register(registerArtifactRoutes, { prefix: "/api/artifacts" });
 
   return app;

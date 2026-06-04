@@ -16,6 +16,12 @@ export const StepRunSchema = z.object({
   attempt: z.number().int().positive(),
   status: z.enum(STEP_RUN_STATUSES),
   codexThreadId: z.string().optional(),
+  promptSnapshot: z.string().optional(),
+  codexOptions: z.record(z.string(), z.unknown()).default({}),
+  codexFinalResponse: z.string().optional(),
+  codexUsage: z.record(z.string(), z.unknown()).optional(),
+  codexError: z.record(z.string(), z.unknown()).optional(),
+  codexCompletedAt: z.coerce.date().optional(),
   staleReason: z.string().optional()
 });
 

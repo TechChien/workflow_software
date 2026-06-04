@@ -19,13 +19,7 @@ export const HumanDecisionRequestSchema = z.object({
   targetStepId: z.string().optional()
 });
 
-export const CodexInteractionResponseSchema = z.object({
-  decision: z.enum(["approve", "deny", "answer"]),
-  answer: z.string().optional()
-});
-
 export type CreateWorkflowRequest = z.infer<typeof CreateWorkflowRequestSchema>;
 export type UpdateDraftWorkflowRequest = z.infer<typeof UpdateDraftWorkflowRequestSchema>;
 export type CreateRunRequest = z.infer<typeof CreateRunRequestSchema>;
 export type HumanDecisionRequest = z.infer<typeof HumanDecisionRequestSchema>;
-export type CodexInteractionResponse = z.infer<typeof CodexInteractionResponseSchema>;

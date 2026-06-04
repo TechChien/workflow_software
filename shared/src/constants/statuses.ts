@@ -11,6 +11,7 @@ export const STEP_RUN_STATUSES = [
   "pending",
   "ready",
   "running",
+  "codex_completed",
   "waiting_for_codex_permission",
   "waiting_for_codex_question",
   "waiting_for_human_review",

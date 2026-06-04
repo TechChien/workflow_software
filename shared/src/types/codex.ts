@@ -1,9 +1,15 @@
-export type CodexPauseKind = "permission" | "question";
+export type CodexInteractionKind =
+  | "item.completed"
+  | "turn.completed"
+  | "turn.failed"
+  | "error";
 
 export type CodexInteractionEvent = {
   id: string;
   stepRunId: string;
-  kind: CodexPauseKind;
-  prompt: string;
-  status: "pending" | "answered" | "auto_skipped";
+  sequence: number;
+  externalItemId?: string;
+  kind: CodexInteractionKind;
+  status: "completed" | "failed";
+  payload: Record<string, unknown>;
 };

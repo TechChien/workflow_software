@@ -7,11 +7,14 @@
     "dev": "pnpm --filter @workflow-software/shared build && tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
     "typecheck": "pnpm --filter @workflow-software/shared build && tsc --noEmit -p tsconfig.json",
+    "test": "tsc -p ../shared/tsconfig.json && vitest run",
+    "test:watch": "tsc -p ../shared/tsconfig.json && vitest",
+    "codex:smoke": "tsx src/codex/smoke.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev"
   },
   "dependencies": {
-    "@openai/codex-sdk": "latest",
+    "@openai/codex-sdk": "0.136.0",
     "@prisma/client": "latest",
     "@workflow-software/shared": "workspace:*",
     "fastify": "latest",
@@ -21,6 +24,7 @@
     "@types/node": "latest",
     "prisma": "latest",
     "tsx": "latest",
-    "typescript": "latest"
+    "typescript": "latest",
+    "vitest": "3.2.4"
   }
 }

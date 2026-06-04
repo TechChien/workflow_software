@@ -19,6 +19,7 @@ enum StepRunStatus {
   PENDING
   READY
   RUNNING
+  CODEX_COMPLETED
   WAITING_FOR_CODEX_PERMISSION
   WAITING_FOR_CODEX_QUESTION
   WAITING_FOR_HUMAN_REVIEW
@@ -98,6 +99,12 @@ model StepRun {
   upstreamStepRunId    String?
   downstreamStepRunId  String?
   codexThreadId       String?
+  promptSnapshot      String?                @db.Text
+  codexOptions        Json                   @default("{}")
+  codexFinalResponse  String?                @db.Text
+  codexUsage          Json?
+  codexError          Json?
+  codexCompletedAt    DateTime?
   codeWorkspaceId     String?
   beforeCommit        String?
   afterCommit         String?
@@ -116,6 +123,7 @@ model StepRun {
   codeChangeRecords   CodeChangeRecord[]
 
   @@index([workflowRunId, status])
+  @@unique([codexThreadId])
 }
 
 model StepRunArtifactInput {
@@ -163,14 +171,18 @@ model DecisionEvent {
 }
 
 model CodexInteractionEvent {
-  id        String   @id @default(cuid())
-  stepRunId String
-  kind      String
-  prompt    String   @db.Text
-  status    String
-  payload   Json     @default("{}")
-  createdAt DateTime @default(now())
-  stepRun   StepRun  @relation(fields: [stepRunId], references: [id])
+  id             String   @id @default(cuid())
+  stepRunId      String
+  sequence       Int
+  externalItemId String?
+  kind           String
+  status         String
+  payload        Json     @default("{}")
+  createdAt      DateTime @default(now())
+  stepRun        StepRun  @relation(fields: [stepRunId], references: [id])
+
+  @@unique([stepRunId, sequence])
+  @@unique([stepRunId, externalItemId])
 }
 
 model ContextPathEvent {
