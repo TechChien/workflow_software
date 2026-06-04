@@ -1,5 +1,5 @@
 import { parse, stringify } from "yaml";
-import { WorkflowYamlSchema, type WorkflowYaml } from "../schemas/workflow-yaml";
+import { WorkflowYamlSchema, type WorkflowYaml } from "../schemas/workflow-yaml.js";
 
 export function parseWorkflowYaml(source: string): WorkflowYaml {
   return WorkflowYamlSchema.parse(parse(source));

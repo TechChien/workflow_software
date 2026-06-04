@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { StepDefinitionSchema } from "./steps";
+import { StepDefinitionSchema } from "./steps.js";
 
 export const WorkflowYamlSchema = z.object({
   id: z.string().min(1),

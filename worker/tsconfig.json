@@ -8,11 +8,7 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "sourceMap": true,
-    "baseUrl": ".",
-    "paths": {
-      "@workflow-software/shared": ["../shared/src/index.ts"]
-    }
+    "sourceMap": true
   },
   "include": ["src"]
 }

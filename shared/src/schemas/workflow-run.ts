@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { STEP_RUN_STATUSES, WORKFLOW_RUN_STATUSES } from "../constants/statuses";
+import { STEP_RUN_STATUSES, WORKFLOW_RUN_STATUSES } from "../constants/statuses.js";
 
 export const WorkflowRunSchema = z.object({
   id: z.string(),

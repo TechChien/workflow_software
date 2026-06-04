@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ARTIFACT_STATUSES } from "../constants/artifact-status";
+import { ARTIFACT_STATUSES } from "../constants/artifact-status.js";
 
 export const ArtifactDefinitionSchema = z.object({
   artifact: z.string().min(1),

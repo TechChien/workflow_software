@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { STEP_TYPES } from "../constants/step-types";
-import { ArtifactDefinitionSchema } from "./artifacts";
+import { STEP_TYPES } from "../constants/step-types.js";
+import { ArtifactDefinitionSchema } from "./artifacts.js";
 
 export const StepArtifactInputSchema = z.object({
   artifact: z.string().min(1),

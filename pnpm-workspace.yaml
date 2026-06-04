@@ -2,3 +2,8 @@ packages:
   - "ui"
   - "worker"
   - "shared"
+allowBuilds:
+  '@prisma/engines': true
+  esbuild: true
+  prisma: true
+  sharp: true

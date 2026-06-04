@@ -1,4 +1,4 @@
-import type { WorkflowYaml } from "../schemas/workflow-yaml";
+import type { WorkflowYaml } from "../schemas/workflow-yaml.js";
 
 export type WorkflowDraft = {
   id: string;
