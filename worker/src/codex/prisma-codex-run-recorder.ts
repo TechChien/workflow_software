@@ -7,6 +7,11 @@ import type {
   RecordedCodexEvent
 } from "./codex-run-recorder.js";
 
+export type PrismaCodexRunRecorderClient = Pick<
+  PrismaClient,
+  "stepRun" | "codexInteractionEvent"
+>;
+
 function inputJson(value: unknown): Prisma.InputJsonValue {
   return value as Prisma.InputJsonValue;
 }
@@ -18,7 +23,7 @@ async function requireTransition(result: { count: number }, message: string) {
 }
 
 export class PrismaCodexRunRecorder implements CodexRunRecorder {
-  constructor(private readonly client: PrismaClient = prisma) {}
+  constructor(private readonly client: PrismaCodexRunRecorderClient = prisma) {}
 
   async loadSource(stepRunId: string): Promise<CodexStepRunSource> {
     const stepRun = await this.client.stepRun.findUniqueOrThrow({
