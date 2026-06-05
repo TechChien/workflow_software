@@ -15,9 +15,11 @@
   },
   "dependencies": {
     "@openai/codex-sdk": "0.136.0",
+    "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "latest",
     "@workflow-software/shared": "workspace:*",
     "fastify": "latest",
+    "pg": "^8.21.0",
     "zod": "latest"
   },
   "devDependencies": {

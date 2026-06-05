@@ -1,4 +1,4 @@
-import { Prisma, type PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "../generated/prisma/client.js";
 import { prisma } from "../db/prisma.js";
 import type {
   CodexRunFailure,

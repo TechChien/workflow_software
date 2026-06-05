@@ -1,4 +1,14 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { z } from "zod";
+
+const workerRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+const envFile = path.join(workerRoot, ".env");
+
+if (existsSync(envFile)) {
+  process.loadEnvFile(envFile);
+}
 
 const EnvSchema = z.object({
   HOST: z.string().default("0.0.0.0"),
