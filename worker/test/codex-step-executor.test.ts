@@ -43,6 +43,9 @@ function sourceFor(prompt: string, type: "agent" | "code_agent" = "agent") {
         context_paths: [],
         tool_capabilities: [],
         prompt,
+        evaluate: {
+          evaluator: "mixed",
+        },
         acceptance: { criteria: [] }
       }
     ],
