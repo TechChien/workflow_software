@@ -27,7 +27,7 @@ const usage: Usage = {
   reasoning_output_tokens: 1
 };
 
-function sourceFor(prompt: string, type: "agent" | "code_agent" | "human_review" = "agent") {
+function sourceFor(prompt: string, type: "agent" | "code_agent" = "agent") {
   const snapshot = canonicalizeWorkflowDefinition({
     id: "workflow-1",
     name: "Codex test workflow",

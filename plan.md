@@ -85,7 +85,10 @@ steps:
 - Step types:
   - `agent`: Codex produces one or more text artifacts。
   - `code_agent`: Codex may modify source code in dedicated worktree and produces artifacts。
-  - `human_review`: explicit pause gate; produces decision event。
+- Step evaluation:
+  - `mixed`: evaluator and human review may both participate。
+  - `human_review`: human reviewer produces the decision event。
+  - `evaluator_review`: automated evaluator produces the decision event。
 - Codex pause states:
   - `waiting_for_codex_permission`
   - `waiting_for_codex_question`

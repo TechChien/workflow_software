@@ -10,6 +10,8 @@ version: 0.1.0
 steps:
   - id: g1_intent_freeze
     type: agent
+    evaluate:
+      evaluator: mixed
     downstream: g2_gap_analysis
     output_artifacts:
       - artifact: g1_requirements
@@ -20,6 +22,8 @@ steps:
         - Every requirement is traceable to the original request.
   - id: g2_gap_analysis
     type: code_agent
+    evaluate:
+      evaluator: human_review
     upstream: g1_intent_freeze
     output_artifacts:
       - artifact: g2_gap_summary

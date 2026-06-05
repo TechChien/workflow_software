@@ -1460,6 +1460,7 @@ export const StepRunScalarFieldEnum = {
   stepId: 'stepId',
   attempt: 'attempt',
   status: 'status',
+  evaluator: 'evaluator',
   upstreamStepRunId: 'upstreamStepRunId',
   downstreamStepRunId: 'downstreamStepRunId',
   codexThreadId: 'codexThreadId',
@@ -1737,6 +1738,20 @@ export type EnumStepRunStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$Pr
  * Reference to a field of type 'StepRunStatus[]'
  */
 export type ListEnumStepRunStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'StepRunStatus[]'>
+    
+
+
+/**
+ * Reference to a field of type 'StepRunEvaluator'
+ */
+export type EnumStepRunEvaluatorFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'StepRunEvaluator'>
+    
+
+
+/**
+ * Reference to a field of type 'StepRunEvaluator[]'
+ */
+export type ListEnumStepRunEvaluatorFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'StepRunEvaluator[]'>
     
 
 

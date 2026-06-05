@@ -31,6 +31,12 @@ enum StepRunStatus {
   STALE
 }
 
+enum StepRunEvaluator {
+  MIXED @map("mixed")
+  HUMAN_REVIEW @map("human_review")
+  EVALUATOR_REVIEW @map("evaluator_review")
+}
+
 enum ArtifactStatus {
   CANDIDATE
   ACCEPTED
@@ -97,6 +103,7 @@ model StepRun {
   stepId              String
   attempt             Int                    @default(1)
   status              StepRunStatus          @default(PENDING)
+  evaluator           StepRunEvaluator       @default(MIXED)
   upstreamStepRunId    String?
   downstreamStepRunId  String?
   codexThreadId       String?

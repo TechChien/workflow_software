@@ -1,6 +1,20 @@
-import type { Prisma } from "@prisma/client";
+import { StepRunEvaluator, type Prisma } from "../generated/prisma/client.js";
 import { prisma } from "../db/prisma.js";
 import { parseVerifiedWorkflowSnapshot } from "./workflow-definition.js";
+
+const STEP_RUN_EVALUATOR_BY_DEFINITION = {
+  mixed: StepRunEvaluator.MIXED,
+  human_review: StepRunEvaluator.HUMAN_REVIEW,
+  evaluator_review: StepRunEvaluator.EVALUATOR_REVIEW
+} as const;
+
+function resolveStepRunEvaluator(evaluator: string) {
+  return (
+    STEP_RUN_EVALUATOR_BY_DEFINITION[
+      evaluator as keyof typeof STEP_RUN_EVALUATOR_BY_DEFINITION
+    ] ?? StepRunEvaluator.MIXED
+  );
+}
 
 export async function createWorkflowRun(
   workflowVersionId: string,
@@ -13,7 +27,7 @@ export async function createWorkflowRun(
     workflowVersion.yamlSnapshot,
     workflowVersion.contentHash
   );
-
+  // add workflow run with published snapshot YAML 
   return prisma.workflowRun.create({
     data: {
       workflowVersionId,
@@ -22,6 +36,7 @@ export async function createWorkflowRun(
         create: definition.steps.map((step) => ({
           stepId: step.id,
           status: step.upstream ? ("PENDING" as const) : ("READY" as const),
+          evaluator: resolveStepRunEvaluator(step.evaluate.evaluator),
           requiresCodeReview: step.type === "code_agent"
         }))
       }

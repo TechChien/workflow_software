@@ -39,6 +39,15 @@ export const StepRunStatus = {
 export type StepRunStatus = (typeof StepRunStatus)[keyof typeof StepRunStatus]
 
 
+export const StepRunEvaluator = {
+  MIXED: 'MIXED',
+  HUMAN_REVIEW: 'HUMAN_REVIEW',
+  EVALUATOR_REVIEW: 'EVALUATOR_REVIEW'
+} as const
+
+export type StepRunEvaluator = (typeof StepRunEvaluator)[keyof typeof StepRunEvaluator]
+
+
 export const ArtifactStatus = {
   CANDIDATE: 'CANDIDATE',
   ACCEPTED: 'ACCEPTED',

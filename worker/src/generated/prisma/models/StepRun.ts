@@ -40,6 +40,7 @@ export type StepRunMinAggregateOutputType = {
   stepId: string | null
   attempt: number | null
   status: $Enums.StepRunStatus | null
+  evaluator: $Enums.StepRunEvaluator | null
   upstreamStepRunId: string | null
   downstreamStepRunId: string | null
   codexThreadId: string | null
@@ -62,6 +63,7 @@ export type StepRunMaxAggregateOutputType = {
   stepId: string | null
   attempt: number | null
   status: $Enums.StepRunStatus | null
+  evaluator: $Enums.StepRunEvaluator | null
   upstreamStepRunId: string | null
   downstreamStepRunId: string | null
   codexThreadId: string | null
@@ -84,6 +86,7 @@ export type StepRunCountAggregateOutputType = {
   stepId: number
   attempt: number
   status: number
+  evaluator: number
   upstreamStepRunId: number
   downstreamStepRunId: number
   codexThreadId: number
@@ -119,6 +122,7 @@ export type StepRunMinAggregateInputType = {
   stepId?: true
   attempt?: true
   status?: true
+  evaluator?: true
   upstreamStepRunId?: true
   downstreamStepRunId?: true
   codexThreadId?: true
@@ -141,6 +145,7 @@ export type StepRunMaxAggregateInputType = {
   stepId?: true
   attempt?: true
   status?: true
+  evaluator?: true
   upstreamStepRunId?: true
   downstreamStepRunId?: true
   codexThreadId?: true
@@ -163,6 +168,7 @@ export type StepRunCountAggregateInputType = {
   stepId?: true
   attempt?: true
   status?: true
+  evaluator?: true
   upstreamStepRunId?: true
   downstreamStepRunId?: true
   codexThreadId?: true
@@ -275,6 +281,7 @@ export type StepRunGroupByOutputType = {
   stepId: string
   attempt: number
   status: $Enums.StepRunStatus
+  evaluator: $Enums.StepRunEvaluator
   upstreamStepRunId: string | null
   downstreamStepRunId: string | null
   codexThreadId: string | null
@@ -323,6 +330,7 @@ export type StepRunWhereInput = {
   stepId?: Prisma.StringFilter<"StepRun"> | string
   attempt?: Prisma.IntFilter<"StepRun"> | number
   status?: Prisma.EnumStepRunStatusFilter<"StepRun"> | $Enums.StepRunStatus
+  evaluator?: Prisma.EnumStepRunEvaluatorFilter<"StepRun"> | $Enums.StepRunEvaluator
   upstreamStepRunId?: Prisma.StringNullableFilter<"StepRun"> | string | null
   downstreamStepRunId?: Prisma.StringNullableFilter<"StepRun"> | string | null
   codexThreadId?: Prisma.StringNullableFilter<"StepRun"> | string | null
@@ -356,6 +364,7 @@ export type StepRunOrderByWithRelationInput = {
   stepId?: Prisma.SortOrder
   attempt?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  evaluator?: Prisma.SortOrder
   upstreamStepRunId?: Prisma.SortOrderInput | Prisma.SortOrder
   downstreamStepRunId?: Prisma.SortOrderInput | Prisma.SortOrder
   codexThreadId?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -393,6 +402,7 @@ export type StepRunWhereUniqueInput = Prisma.AtLeast<{
   stepId?: Prisma.StringFilter<"StepRun"> | string
   attempt?: Prisma.IntFilter<"StepRun"> | number
   status?: Prisma.EnumStepRunStatusFilter<"StepRun"> | $Enums.StepRunStatus
+  evaluator?: Prisma.EnumStepRunEvaluatorFilter<"StepRun"> | $Enums.StepRunEvaluator
   upstreamStepRunId?: Prisma.StringNullableFilter<"StepRun"> | string | null
   downstreamStepRunId?: Prisma.StringNullableFilter<"StepRun"> | string | null
   promptSnapshot?: Prisma.StringNullableFilter<"StepRun"> | string | null
@@ -425,6 +435,7 @@ export type StepRunOrderByWithAggregationInput = {
   stepId?: Prisma.SortOrder
   attempt?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  evaluator?: Prisma.SortOrder
   upstreamStepRunId?: Prisma.SortOrderInput | Prisma.SortOrder
   downstreamStepRunId?: Prisma.SortOrderInput | Prisma.SortOrder
   codexThreadId?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -458,6 +469,7 @@ export type StepRunScalarWhereWithAggregatesInput = {
   stepId?: Prisma.StringWithAggregatesFilter<"StepRun"> | string
   attempt?: Prisma.IntWithAggregatesFilter<"StepRun"> | number
   status?: Prisma.EnumStepRunStatusWithAggregatesFilter<"StepRun"> | $Enums.StepRunStatus
+  evaluator?: Prisma.EnumStepRunEvaluatorWithAggregatesFilter<"StepRun"> | $Enums.StepRunEvaluator
   upstreamStepRunId?: Prisma.StringNullableWithAggregatesFilter<"StepRun"> | string | null
   downstreamStepRunId?: Prisma.StringNullableWithAggregatesFilter<"StepRun"> | string | null
   codexThreadId?: Prisma.StringNullableWithAggregatesFilter<"StepRun"> | string | null
@@ -482,6 +494,7 @@ export type StepRunCreateInput = {
   stepId: string
   attempt?: number
   status?: $Enums.StepRunStatus
+  evaluator?: $Enums.StepRunEvaluator
   upstreamStepRunId?: string | null
   downstreamStepRunId?: string | null
   codexThreadId?: string | null
@@ -515,6 +528,7 @@ export type StepRunUncheckedCreateInput = {
   stepId: string
   attempt?: number
   status?: $Enums.StepRunStatus
+  evaluator?: $Enums.StepRunEvaluator
   upstreamStepRunId?: string | null
   downstreamStepRunId?: string | null
   codexThreadId?: string | null
@@ -546,6 +560,7 @@ export type StepRunUpdateInput = {
   stepId?: Prisma.StringFieldUpdateOperationsInput | string
   attempt?: Prisma.IntFieldUpdateOperationsInput | number
   status?: Prisma.EnumStepRunStatusFieldUpdateOperationsInput | $Enums.StepRunStatus
+  evaluator?: Prisma.EnumStepRunEvaluatorFieldUpdateOperationsInput | $Enums.StepRunEvaluator
   upstreamStepRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   downstreamStepRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   codexThreadId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -579,6 +594,7 @@ export type StepRunUncheckedUpdateInput = {
   stepId?: Prisma.StringFieldUpdateOperationsInput | string
   attempt?: Prisma.IntFieldUpdateOperationsInput | number
   status?: Prisma.EnumStepRunStatusFieldUpdateOperationsInput | $Enums.StepRunStatus
+  evaluator?: Prisma.EnumStepRunEvaluatorFieldUpdateOperationsInput | $Enums.StepRunEvaluator
   upstreamStepRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   downstreamStepRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   codexThreadId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -611,6 +627,7 @@ export type StepRunCreateManyInput = {
   stepId: string
   attempt?: number
   status?: $Enums.StepRunStatus
+  evaluator?: $Enums.StepRunEvaluator
   upstreamStepRunId?: string | null
   downstreamStepRunId?: string | null
   codexThreadId?: string | null
@@ -635,6 +652,7 @@ export type StepRunUpdateManyMutationInput = {
   stepId?: Prisma.StringFieldUpdateOperationsInput | string
   attempt?: Prisma.IntFieldUpdateOperationsInput | number
   status?: Prisma.EnumStepRunStatusFieldUpdateOperationsInput | $Enums.StepRunStatus
+  evaluator?: Prisma.EnumStepRunEvaluatorFieldUpdateOperationsInput | $Enums.StepRunEvaluator
   upstreamStepRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   downstreamStepRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   codexThreadId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -660,6 +678,7 @@ export type StepRunUncheckedUpdateManyInput = {
   stepId?: Prisma.StringFieldUpdateOperationsInput | string
   attempt?: Prisma.IntFieldUpdateOperationsInput | number
   status?: Prisma.EnumStepRunStatusFieldUpdateOperationsInput | $Enums.StepRunStatus
+  evaluator?: Prisma.EnumStepRunEvaluatorFieldUpdateOperationsInput | $Enums.StepRunEvaluator
   upstreamStepRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   downstreamStepRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   codexThreadId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -695,6 +714,7 @@ export type StepRunCountOrderByAggregateInput = {
   stepId?: Prisma.SortOrder
   attempt?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  evaluator?: Prisma.SortOrder
   upstreamStepRunId?: Prisma.SortOrder
   downstreamStepRunId?: Prisma.SortOrder
   codexThreadId?: Prisma.SortOrder
@@ -724,6 +744,7 @@ export type StepRunMaxOrderByAggregateInput = {
   stepId?: Prisma.SortOrder
   attempt?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  evaluator?: Prisma.SortOrder
   upstreamStepRunId?: Prisma.SortOrder
   downstreamStepRunId?: Prisma.SortOrder
   codexThreadId?: Prisma.SortOrder
@@ -746,6 +767,7 @@ export type StepRunMinOrderByAggregateInput = {
   stepId?: Prisma.SortOrder
   attempt?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  evaluator?: Prisma.SortOrder
   upstreamStepRunId?: Prisma.SortOrder
   downstreamStepRunId?: Prisma.SortOrder
   codexThreadId?: Prisma.SortOrder
@@ -815,6 +837,10 @@ export type StepRunUncheckedUpdateManyWithoutWorkflowRunNestedInput = {
 
 export type EnumStepRunStatusFieldUpdateOperationsInput = {
   set?: $Enums.StepRunStatus
+}
+
+export type EnumStepRunEvaluatorFieldUpdateOperationsInput = {
+  set?: $Enums.StepRunEvaluator
 }
 
 export type NullableStringFieldUpdateOperationsInput = {
@@ -928,6 +954,7 @@ export type StepRunCreateWithoutWorkflowRunInput = {
   stepId: string
   attempt?: number
   status?: $Enums.StepRunStatus
+  evaluator?: $Enums.StepRunEvaluator
   upstreamStepRunId?: string | null
   downstreamStepRunId?: string | null
   codexThreadId?: string | null
@@ -959,6 +986,7 @@ export type StepRunUncheckedCreateWithoutWorkflowRunInput = {
   stepId: string
   attempt?: number
   status?: $Enums.StepRunStatus
+  evaluator?: $Enums.StepRunEvaluator
   upstreamStepRunId?: string | null
   downstreamStepRunId?: string | null
   codexThreadId?: string | null
@@ -1020,6 +1048,7 @@ export type StepRunScalarWhereInput = {
   stepId?: Prisma.StringFilter<"StepRun"> | string
   attempt?: Prisma.IntFilter<"StepRun"> | number
   status?: Prisma.EnumStepRunStatusFilter<"StepRun"> | $Enums.StepRunStatus
+  evaluator?: Prisma.EnumStepRunEvaluatorFilter<"StepRun"> | $Enums.StepRunEvaluator
   upstreamStepRunId?: Prisma.StringNullableFilter<"StepRun"> | string | null
   downstreamStepRunId?: Prisma.StringNullableFilter<"StepRun"> | string | null
   codexThreadId?: Prisma.StringNullableFilter<"StepRun"> | string | null
@@ -1044,6 +1073,7 @@ export type StepRunCreateWithoutArtifactInputsInput = {
   stepId: string
   attempt?: number
   status?: $Enums.StepRunStatus
+  evaluator?: $Enums.StepRunEvaluator
   upstreamStepRunId?: string | null
   downstreamStepRunId?: string | null
   codexThreadId?: string | null
@@ -1076,6 +1106,7 @@ export type StepRunUncheckedCreateWithoutArtifactInputsInput = {
   stepId: string
   attempt?: number
   status?: $Enums.StepRunStatus
+  evaluator?: $Enums.StepRunEvaluator
   upstreamStepRunId?: string | null
   downstreamStepRunId?: string | null
   codexThreadId?: string | null
@@ -1122,6 +1153,7 @@ export type StepRunUpdateWithoutArtifactInputsInput = {
   stepId?: Prisma.StringFieldUpdateOperationsInput | string
   attempt?: Prisma.IntFieldUpdateOperationsInput | number
   status?: Prisma.EnumStepRunStatusFieldUpdateOperationsInput | $Enums.StepRunStatus
+  evaluator?: Prisma.EnumStepRunEvaluatorFieldUpdateOperationsInput | $Enums.StepRunEvaluator
   upstreamStepRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   downstreamStepRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   codexThreadId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1154,6 +1186,7 @@ export type StepRunUncheckedUpdateWithoutArtifactInputsInput = {
   stepId?: Prisma.StringFieldUpdateOperationsInput | string
   attempt?: Prisma.IntFieldUpdateOperationsInput | number
   status?: Prisma.EnumStepRunStatusFieldUpdateOperationsInput | $Enums.StepRunStatus
+  evaluator?: Prisma.EnumStepRunEvaluatorFieldUpdateOperationsInput | $Enums.StepRunEvaluator
   upstreamStepRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   downstreamStepRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   codexThreadId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1184,6 +1217,7 @@ export type StepRunCreateWithoutProducedArtifactsInput = {
   stepId: string
   attempt?: number
   status?: $Enums.StepRunStatus
+  evaluator?: $Enums.StepRunEvaluator
   upstreamStepRunId?: string | null
   downstreamStepRunId?: string | null
   codexThreadId?: string | null
@@ -1216,6 +1250,7 @@ export type StepRunUncheckedCreateWithoutProducedArtifactsInput = {
   stepId: string
   attempt?: number
   status?: $Enums.StepRunStatus
+  evaluator?: $Enums.StepRunEvaluator
   upstreamStepRunId?: string | null
   downstreamStepRunId?: string | null
   codexThreadId?: string | null
@@ -1262,6 +1297,7 @@ export type StepRunUpdateWithoutProducedArtifactsInput = {
   stepId?: Prisma.StringFieldUpdateOperationsInput | string
   attempt?: Prisma.IntFieldUpdateOperationsInput | number
   status?: Prisma.EnumStepRunStatusFieldUpdateOperationsInput | $Enums.StepRunStatus
+  evaluator?: Prisma.EnumStepRunEvaluatorFieldUpdateOperationsInput | $Enums.StepRunEvaluator
   upstreamStepRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   downstreamStepRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   codexThreadId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1294,6 +1330,7 @@ export type StepRunUncheckedUpdateWithoutProducedArtifactsInput = {
   stepId?: Prisma.StringFieldUpdateOperationsInput | string
   attempt?: Prisma.IntFieldUpdateOperationsInput | number
   status?: Prisma.EnumStepRunStatusFieldUpdateOperationsInput | $Enums.StepRunStatus
+  evaluator?: Prisma.EnumStepRunEvaluatorFieldUpdateOperationsInput | $Enums.StepRunEvaluator
   upstreamStepRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   downstreamStepRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   codexThreadId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1324,6 +1361,7 @@ export type StepRunCreateWithoutDecisionEventsInput = {
   stepId: string
   attempt?: number
   status?: $Enums.StepRunStatus
+  evaluator?: $Enums.StepRunEvaluator
   upstreamStepRunId?: string | null
   downstreamStepRunId?: string | null
   codexThreadId?: string | null
@@ -1356,6 +1394,7 @@ export type StepRunUncheckedCreateWithoutDecisionEventsInput = {
   stepId: string
   attempt?: number
   status?: $Enums.StepRunStatus
+  evaluator?: $Enums.StepRunEvaluator
   upstreamStepRunId?: string | null
   downstreamStepRunId?: string | null
   codexThreadId?: string | null
@@ -1402,6 +1441,7 @@ export type StepRunUpdateWithoutDecisionEventsInput = {
   stepId?: Prisma.StringFieldUpdateOperationsInput | string
   attempt?: Prisma.IntFieldUpdateOperationsInput | number
   status?: Prisma.EnumStepRunStatusFieldUpdateOperationsInput | $Enums.StepRunStatus
+  evaluator?: Prisma.EnumStepRunEvaluatorFieldUpdateOperationsInput | $Enums.StepRunEvaluator
   upstreamStepRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   downstreamStepRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   codexThreadId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1434,6 +1474,7 @@ export type StepRunUncheckedUpdateWithoutDecisionEventsInput = {
   stepId?: Prisma.StringFieldUpdateOperationsInput | string
   attempt?: Prisma.IntFieldUpdateOperationsInput | number
   status?: Prisma.EnumStepRunStatusFieldUpdateOperationsInput | $Enums.StepRunStatus
+  evaluator?: Prisma.EnumStepRunEvaluatorFieldUpdateOperationsInput | $Enums.StepRunEvaluator
   upstreamStepRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   downstreamStepRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   codexThreadId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1464,6 +1505,7 @@ export type StepRunCreateWithoutCodexInteractionsInput = {
   stepId: string
   attempt?: number
   status?: $Enums.StepRunStatus
+  evaluator?: $Enums.StepRunEvaluator
   upstreamStepRunId?: string | null
   downstreamStepRunId?: string | null
   codexThreadId?: string | null
@@ -1496,6 +1538,7 @@ export type StepRunUncheckedCreateWithoutCodexInteractionsInput = {
   stepId: string
   attempt?: number
   status?: $Enums.StepRunStatus
+  evaluator?: $Enums.StepRunEvaluator
   upstreamStepRunId?: string | null
   downstreamStepRunId?: string | null
   codexThreadId?: string | null
@@ -1542,6 +1585,7 @@ export type StepRunUpdateWithoutCodexInteractionsInput = {
   stepId?: Prisma.StringFieldUpdateOperationsInput | string
   attempt?: Prisma.IntFieldUpdateOperationsInput | number
   status?: Prisma.EnumStepRunStatusFieldUpdateOperationsInput | $Enums.StepRunStatus
+  evaluator?: Prisma.EnumStepRunEvaluatorFieldUpdateOperationsInput | $Enums.StepRunEvaluator
   upstreamStepRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   downstreamStepRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   codexThreadId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1574,6 +1618,7 @@ export type StepRunUncheckedUpdateWithoutCodexInteractionsInput = {
   stepId?: Prisma.StringFieldUpdateOperationsInput | string
   attempt?: Prisma.IntFieldUpdateOperationsInput | number
   status?: Prisma.EnumStepRunStatusFieldUpdateOperationsInput | $Enums.StepRunStatus
+  evaluator?: Prisma.EnumStepRunEvaluatorFieldUpdateOperationsInput | $Enums.StepRunEvaluator
   upstreamStepRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   downstreamStepRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   codexThreadId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1604,6 +1649,7 @@ export type StepRunCreateWithoutContextPathEventsInput = {
   stepId: string
   attempt?: number
   status?: $Enums.StepRunStatus
+  evaluator?: $Enums.StepRunEvaluator
   upstreamStepRunId?: string | null
   downstreamStepRunId?: string | null
   codexThreadId?: string | null
@@ -1636,6 +1682,7 @@ export type StepRunUncheckedCreateWithoutContextPathEventsInput = {
   stepId: string
   attempt?: number
   status?: $Enums.StepRunStatus
+  evaluator?: $Enums.StepRunEvaluator
   upstreamStepRunId?: string | null
   downstreamStepRunId?: string | null
   codexThreadId?: string | null
@@ -1682,6 +1729,7 @@ export type StepRunUpdateWithoutContextPathEventsInput = {
   stepId?: Prisma.StringFieldUpdateOperationsInput | string
   attempt?: Prisma.IntFieldUpdateOperationsInput | number
   status?: Prisma.EnumStepRunStatusFieldUpdateOperationsInput | $Enums.StepRunStatus
+  evaluator?: Prisma.EnumStepRunEvaluatorFieldUpdateOperationsInput | $Enums.StepRunEvaluator
   upstreamStepRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   downstreamStepRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   codexThreadId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1714,6 +1762,7 @@ export type StepRunUncheckedUpdateWithoutContextPathEventsInput = {
   stepId?: Prisma.StringFieldUpdateOperationsInput | string
   attempt?: Prisma.IntFieldUpdateOperationsInput | number
   status?: Prisma.EnumStepRunStatusFieldUpdateOperationsInput | $Enums.StepRunStatus
+  evaluator?: Prisma.EnumStepRunEvaluatorFieldUpdateOperationsInput | $Enums.StepRunEvaluator
   upstreamStepRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   downstreamStepRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   codexThreadId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1744,6 +1793,7 @@ export type StepRunCreateWithoutToolInvocationsInput = {
   stepId: string
   attempt?: number
   status?: $Enums.StepRunStatus
+  evaluator?: $Enums.StepRunEvaluator
   upstreamStepRunId?: string | null
   downstreamStepRunId?: string | null
   codexThreadId?: string | null
@@ -1776,6 +1826,7 @@ export type StepRunUncheckedCreateWithoutToolInvocationsInput = {
   stepId: string
   attempt?: number
   status?: $Enums.StepRunStatus
+  evaluator?: $Enums.StepRunEvaluator
   upstreamStepRunId?: string | null
   downstreamStepRunId?: string | null
   codexThreadId?: string | null
@@ -1822,6 +1873,7 @@ export type StepRunUpdateWithoutToolInvocationsInput = {
   stepId?: Prisma.StringFieldUpdateOperationsInput | string
   attempt?: Prisma.IntFieldUpdateOperationsInput | number
   status?: Prisma.EnumStepRunStatusFieldUpdateOperationsInput | $Enums.StepRunStatus
+  evaluator?: Prisma.EnumStepRunEvaluatorFieldUpdateOperationsInput | $Enums.StepRunEvaluator
   upstreamStepRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   downstreamStepRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   codexThreadId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1854,6 +1906,7 @@ export type StepRunUncheckedUpdateWithoutToolInvocationsInput = {
   stepId?: Prisma.StringFieldUpdateOperationsInput | string
   attempt?: Prisma.IntFieldUpdateOperationsInput | number
   status?: Prisma.EnumStepRunStatusFieldUpdateOperationsInput | $Enums.StepRunStatus
+  evaluator?: Prisma.EnumStepRunEvaluatorFieldUpdateOperationsInput | $Enums.StepRunEvaluator
   upstreamStepRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   downstreamStepRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   codexThreadId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1884,6 +1937,7 @@ export type StepRunCreateWithoutCodeChangeRecordsInput = {
   stepId: string
   attempt?: number
   status?: $Enums.StepRunStatus
+  evaluator?: $Enums.StepRunEvaluator
   upstreamStepRunId?: string | null
   downstreamStepRunId?: string | null
   codexThreadId?: string | null
@@ -1916,6 +1970,7 @@ export type StepRunUncheckedCreateWithoutCodeChangeRecordsInput = {
   stepId: string
   attempt?: number
   status?: $Enums.StepRunStatus
+  evaluator?: $Enums.StepRunEvaluator
   upstreamStepRunId?: string | null
   downstreamStepRunId?: string | null
   codexThreadId?: string | null
@@ -1962,6 +2017,7 @@ export type StepRunUpdateWithoutCodeChangeRecordsInput = {
   stepId?: Prisma.StringFieldUpdateOperationsInput | string
   attempt?: Prisma.IntFieldUpdateOperationsInput | number
   status?: Prisma.EnumStepRunStatusFieldUpdateOperationsInput | $Enums.StepRunStatus
+  evaluator?: Prisma.EnumStepRunEvaluatorFieldUpdateOperationsInput | $Enums.StepRunEvaluator
   upstreamStepRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   downstreamStepRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   codexThreadId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1994,6 +2050,7 @@ export type StepRunUncheckedUpdateWithoutCodeChangeRecordsInput = {
   stepId?: Prisma.StringFieldUpdateOperationsInput | string
   attempt?: Prisma.IntFieldUpdateOperationsInput | number
   status?: Prisma.EnumStepRunStatusFieldUpdateOperationsInput | $Enums.StepRunStatus
+  evaluator?: Prisma.EnumStepRunEvaluatorFieldUpdateOperationsInput | $Enums.StepRunEvaluator
   upstreamStepRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   downstreamStepRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   codexThreadId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2024,6 +2081,7 @@ export type StepRunCreateManyWorkflowRunInput = {
   stepId: string
   attempt?: number
   status?: $Enums.StepRunStatus
+  evaluator?: $Enums.StepRunEvaluator
   upstreamStepRunId?: string | null
   downstreamStepRunId?: string | null
   codexThreadId?: string | null
@@ -2048,6 +2106,7 @@ export type StepRunUpdateWithoutWorkflowRunInput = {
   stepId?: Prisma.StringFieldUpdateOperationsInput | string
   attempt?: Prisma.IntFieldUpdateOperationsInput | number
   status?: Prisma.EnumStepRunStatusFieldUpdateOperationsInput | $Enums.StepRunStatus
+  evaluator?: Prisma.EnumStepRunEvaluatorFieldUpdateOperationsInput | $Enums.StepRunEvaluator
   upstreamStepRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   downstreamStepRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   codexThreadId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2079,6 +2138,7 @@ export type StepRunUncheckedUpdateWithoutWorkflowRunInput = {
   stepId?: Prisma.StringFieldUpdateOperationsInput | string
   attempt?: Prisma.IntFieldUpdateOperationsInput | number
   status?: Prisma.EnumStepRunStatusFieldUpdateOperationsInput | $Enums.StepRunStatus
+  evaluator?: Prisma.EnumStepRunEvaluatorFieldUpdateOperationsInput | $Enums.StepRunEvaluator
   upstreamStepRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   downstreamStepRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   codexThreadId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2110,6 +2170,7 @@ export type StepRunUncheckedUpdateManyWithoutWorkflowRunInput = {
   stepId?: Prisma.StringFieldUpdateOperationsInput | string
   attempt?: Prisma.IntFieldUpdateOperationsInput | number
   status?: Prisma.EnumStepRunStatusFieldUpdateOperationsInput | $Enums.StepRunStatus
+  evaluator?: Prisma.EnumStepRunEvaluatorFieldUpdateOperationsInput | $Enums.StepRunEvaluator
   upstreamStepRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   downstreamStepRunId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   codexThreadId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2220,6 +2281,7 @@ export type StepRunSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   stepId?: boolean
   attempt?: boolean
   status?: boolean
+  evaluator?: boolean
   upstreamStepRunId?: boolean
   downstreamStepRunId?: boolean
   codexThreadId?: boolean
@@ -2254,6 +2316,7 @@ export type StepRunSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Exten
   stepId?: boolean
   attempt?: boolean
   status?: boolean
+  evaluator?: boolean
   upstreamStepRunId?: boolean
   downstreamStepRunId?: boolean
   codexThreadId?: boolean
@@ -2280,6 +2343,7 @@ export type StepRunSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Exten
   stepId?: boolean
   attempt?: boolean
   status?: boolean
+  evaluator?: boolean
   upstreamStepRunId?: boolean
   downstreamStepRunId?: boolean
   codexThreadId?: boolean
@@ -2306,6 +2370,7 @@ export type StepRunSelectScalar = {
   stepId?: boolean
   attempt?: boolean
   status?: boolean
+  evaluator?: boolean
   upstreamStepRunId?: boolean
   downstreamStepRunId?: boolean
   codexThreadId?: boolean
@@ -2325,7 +2390,7 @@ export type StepRunSelectScalar = {
   completedAt?: boolean
 }
 
-export type StepRunOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workflowRunId" | "stepId" | "attempt" | "status" | "upstreamStepRunId" | "downstreamStepRunId" | "codexThreadId" | "promptSnapshot" | "codexOptions" | "codexFinalResponse" | "codexUsage" | "codexError" | "codexCompletedAt" | "codeWorkspaceId" | "beforeCommit" | "afterCommit" | "requiresCodeReview" | "staleReason" | "createdAt" | "startedAt" | "completedAt", ExtArgs["result"]["stepRun"]>
+export type StepRunOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "workflowRunId" | "stepId" | "attempt" | "status" | "evaluator" | "upstreamStepRunId" | "downstreamStepRunId" | "codexThreadId" | "promptSnapshot" | "codexOptions" | "codexFinalResponse" | "codexUsage" | "codexError" | "codexCompletedAt" | "codeWorkspaceId" | "beforeCommit" | "afterCommit" | "requiresCodeReview" | "staleReason" | "createdAt" | "startedAt" | "completedAt", ExtArgs["result"]["stepRun"]>
 export type StepRunInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   workflowRun?: boolean | Prisma.WorkflowRunDefaultArgs<ExtArgs>
   artifactInputs?: boolean | Prisma.StepRun$artifactInputsArgs<ExtArgs>
@@ -2362,6 +2427,7 @@ export type $StepRunPayload<ExtArgs extends runtime.Types.Extensions.InternalArg
     stepId: string
     attempt: number
     status: $Enums.StepRunStatus
+    evaluator: $Enums.StepRunEvaluator
     upstreamStepRunId: string | null
     downstreamStepRunId: string | null
     codexThreadId: string | null
@@ -2815,6 +2881,7 @@ export interface StepRunFieldRefs {
   readonly stepId: Prisma.FieldRef<"StepRun", 'String'>
   readonly attempt: Prisma.FieldRef<"StepRun", 'Int'>
   readonly status: Prisma.FieldRef<"StepRun", 'StepRunStatus'>
+  readonly evaluator: Prisma.FieldRef<"StepRun", 'StepRunEvaluator'>
   readonly upstreamStepRunId: Prisma.FieldRef<"StepRun", 'String'>
   readonly downstreamStepRunId: Prisma.FieldRef<"StepRun", 'String'>
   readonly codexThreadId: Prisma.FieldRef<"StepRun", 'String'>

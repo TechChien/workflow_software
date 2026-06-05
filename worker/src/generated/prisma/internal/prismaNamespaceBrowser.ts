@@ -125,6 +125,7 @@ export const StepRunScalarFieldEnum = {
   stepId: 'stepId',
   attempt: 'attempt',
   status: 'status',
+  evaluator: 'evaluator',
   upstreamStepRunId: 'upstreamStepRunId',
   downstreamStepRunId: 'downstreamStepRunId',
   codexThreadId: 'codexThreadId',

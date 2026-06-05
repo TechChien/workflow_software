@@ -204,6 +204,13 @@ export type EnumStepRunStatusFilter<$PrismaModel = never> = {
   not?: Prisma.NestedEnumStepRunStatusFilter<$PrismaModel> | $Enums.StepRunStatus
 }
 
+export type EnumStepRunEvaluatorFilter<$PrismaModel = never> = {
+  equals?: $Enums.StepRunEvaluator | Prisma.EnumStepRunEvaluatorFieldRefInput<$PrismaModel>
+  in?: $Enums.StepRunEvaluator[] | Prisma.ListEnumStepRunEvaluatorFieldRefInput<$PrismaModel>
+  notIn?: $Enums.StepRunEvaluator[] | Prisma.ListEnumStepRunEvaluatorFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumStepRunEvaluatorFilter<$PrismaModel> | $Enums.StepRunEvaluator
+}
+
 export type StringNullableFilter<$PrismaModel = never> = {
   equals?: string | Prisma.StringFieldRefInput<$PrismaModel> | null
   in?: string[] | Prisma.ListStringFieldRefInput<$PrismaModel> | null
@@ -256,6 +263,16 @@ export type EnumStepRunStatusWithAggregatesFilter<$PrismaModel = never> = {
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumStepRunStatusFilter<$PrismaModel>
   _max?: Prisma.NestedEnumStepRunStatusFilter<$PrismaModel>
+}
+
+export type EnumStepRunEvaluatorWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.StepRunEvaluator | Prisma.EnumStepRunEvaluatorFieldRefInput<$PrismaModel>
+  in?: $Enums.StepRunEvaluator[] | Prisma.ListEnumStepRunEvaluatorFieldRefInput<$PrismaModel>
+  notIn?: $Enums.StepRunEvaluator[] | Prisma.ListEnumStepRunEvaluatorFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumStepRunEvaluatorWithAggregatesFilter<$PrismaModel> | $Enums.StepRunEvaluator
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumStepRunEvaluatorFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumStepRunEvaluatorFilter<$PrismaModel>
 }
 
 export type StringNullableWithAggregatesFilter<$PrismaModel = never> = {
@@ -540,6 +557,13 @@ export type NestedEnumStepRunStatusFilter<$PrismaModel = never> = {
   not?: Prisma.NestedEnumStepRunStatusFilter<$PrismaModel> | $Enums.StepRunStatus
 }
 
+export type NestedEnumStepRunEvaluatorFilter<$PrismaModel = never> = {
+  equals?: $Enums.StepRunEvaluator | Prisma.EnumStepRunEvaluatorFieldRefInput<$PrismaModel>
+  in?: $Enums.StepRunEvaluator[] | Prisma.ListEnumStepRunEvaluatorFieldRefInput<$PrismaModel>
+  notIn?: $Enums.StepRunEvaluator[] | Prisma.ListEnumStepRunEvaluatorFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumStepRunEvaluatorFilter<$PrismaModel> | $Enums.StepRunEvaluator
+}
+
 export type NestedStringNullableFilter<$PrismaModel = never> = {
   equals?: string | Prisma.StringFieldRefInput<$PrismaModel> | null
   in?: string[] | Prisma.ListStringFieldRefInput<$PrismaModel> | null
@@ -567,6 +591,16 @@ export type NestedEnumStepRunStatusWithAggregatesFilter<$PrismaModel = never> = 
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumStepRunStatusFilter<$PrismaModel>
   _max?: Prisma.NestedEnumStepRunStatusFilter<$PrismaModel>
+}
+
+export type NestedEnumStepRunEvaluatorWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.StepRunEvaluator | Prisma.EnumStepRunEvaluatorFieldRefInput<$PrismaModel>
+  in?: $Enums.StepRunEvaluator[] | Prisma.ListEnumStepRunEvaluatorFieldRefInput<$PrismaModel>
+  notIn?: $Enums.StepRunEvaluator[] | Prisma.ListEnumStepRunEvaluatorFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumStepRunEvaluatorWithAggregatesFilter<$PrismaModel> | $Enums.StepRunEvaluator
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumStepRunEvaluatorFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumStepRunEvaluatorFilter<$PrismaModel>
 }
 
 export type NestedStringNullableWithAggregatesFilter<$PrismaModel = never> = {

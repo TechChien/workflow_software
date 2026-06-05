@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { STEP_RUN_EVALUATORS } from "../constants/evaluators.js";
 import { STEP_TYPES } from "../constants/step-types.js";
 import { ArtifactDefinitionSchema } from "./artifacts.js";
 
@@ -18,6 +19,13 @@ export const AcceptanceCriteriaSchema = z
   .transform((criteria) => (typeof criteria === "string" ? (criteria ? [criteria] : []) : criteria))
   .default([]);
 
+export const StepEvaluateSchema = z
+  .object({
+    evaluator: z.enum(STEP_RUN_EVALUATORS).catch("mixed").default("mixed")
+  })
+  .catch({ evaluator: "mixed" })
+  .default({ evaluator: "mixed" });
+
 export const StepDefinitionSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1).optional(),
@@ -28,6 +36,7 @@ export const StepDefinitionSchema = z.object({
   output_artifacts: z.array(ArtifactDefinitionSchema).default([]),
   context_paths: z.array(ContextPathSchema).default([]),
   tool_capabilities: z.array(z.string().min(1)).default([]),
+  evaluate: StepEvaluateSchema,
   prompt: z.string().default(""),
   acceptance: z
     .object({
@@ -38,4 +47,5 @@ export const StepDefinitionSchema = z.object({
 
 export type StepArtifactInput = z.infer<typeof StepArtifactInputSchema>;
 export type ContextPath = z.infer<typeof ContextPathSchema>;
+export type StepEvaluate = z.infer<typeof StepEvaluateSchema>;
 export type StepDefinition = z.infer<typeof StepDefinitionSchema>;

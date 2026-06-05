@@ -11,7 +11,14 @@ export function StepInspector() {
         <select defaultValue="code_agent">
           <option value="agent">Agent</option>
           <option value="code_agent">Code Agent</option>
+        </select>
+      </label>
+      <label>
+        Evaluator
+        <select defaultValue="mixed">
+          <option value="mixed">Mixed</option>
           <option value="human_review">Human Review</option>
+          <option value="evaluator_review">Evaluator Review</option>
         </select>
       </label>
       <label>

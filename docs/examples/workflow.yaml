@@ -6,6 +6,8 @@ artifacts: {}
 steps:
   - id: g1_intent_freeze
     type: agent
+    evaluate:
+      evaluator: mixed
     downstream: g2_gap_analysis
     input_artifacts: []
     output_artifacts:
@@ -23,6 +25,8 @@ steps:
 
   - id: g2_gap_analysis
     type: code_agent
+    evaluate:
+      evaluator: human_review
     upstream: g1_intent_freeze
     input_artifacts:
       - artifact: g1_requirements
