@@ -13,11 +13,13 @@ import type {
   CodexRunRecorder,
   CodexStepRunSource
 } from "../codex/codex-run-recorder.js";
+import type { CodexRuntimePromptContext } from "./artifact-runtime.js";
 import { parseVerifiedWorkflowSnapshot } from "./workflow-definition.js";
 
 export type ExecuteStepRunWithCodexInput = {
   stepRunId: string;
   workingDirectory: string;
+  runtimeContext?: CodexRuntimePromptContext;
   signal?: AbortSignal;
 };
 
@@ -75,6 +77,69 @@ export function resolveCodexStepPrompt(source: CodexStepRunSource) {
     stepType: step.type,
     prompt: step.prompt
   };
+}
+
+function hasRuntimeContext(context: CodexRuntimePromptContext | undefined) {
+  return (
+    context !== undefined &&
+    (context.contextPaths.length > 0 ||
+      context.inputArtifacts.length > 0 ||
+      context.outputArtifacts.length > 0)
+  );
+}
+
+function formatRuntimePromptList(entries: Array<Record<string, unknown>>) {
+  return JSON.stringify(entries, null, 2);
+}
+
+export function buildCodexRuntimePrompt(
+  prompt: string,
+  context: CodexRuntimePromptContext | undefined
+) {
+  if (!hasRuntimeContext(context)) {
+    return prompt;
+  }
+
+  const runtimeContext = context as CodexRuntimePromptContext;
+
+  return [
+    "## Workflow Runtime Contract",
+    "",
+    "Declared output artifacts are authoritative. If the step prompt mentions another output filename, ignore that filename and produce only the declared artifact files below.",
+    "Do not invent additional artifact outputs. Extra files mentioned by the prompt are workspace side effects and will not be accepted as artifacts.",
+    "",
+    "### Context Paths",
+    formatRuntimePromptList(
+      runtimeContext.contextPaths.map((contextPath) => ({
+        path: contextPath.promptPath,
+        type: contextPath.type
+      }))
+    ),
+    "",
+    "### Input Artifacts",
+    formatRuntimePromptList(
+      runtimeContext.inputArtifacts.map((artifact) => ({
+        artifact: artifact.artifact,
+        version: artifact.version,
+        path: artifact.promptPath
+      }))
+    ),
+    "",
+    "### Output Artifacts",
+    formatRuntimePromptList(
+      runtimeContext.outputArtifacts.map((artifact) => ({
+        artifact: artifact.artifact,
+        filename: artifact.filename,
+        path: artifact.promptPath
+      }))
+    ),
+    "",
+    "Write every declared output artifact to its exact path before finishing the turn.",
+    "",
+    "## Step Prompt",
+    "",
+    prompt
+  ].join("\n");
 }
 
 async function assertWorkingDirectory(workingDirectory: string) {
@@ -201,7 +266,8 @@ export async function executeStepRunWithCodexCore(
   await assertWorkingDirectory(input.workingDirectory);
 
   const source = await dependencies.recorder.loadSource(input.stepRunId);
-  const { prompt } = resolveCodexStepPrompt(source);
+  const { prompt: workflowPrompt } = resolveCodexStepPrompt(source);
+  const prompt = buildCodexRuntimePrompt(workflowPrompt, input.runtimeContext);
   const threadOptions = buildCodexThreadOptions(input.workingDirectory, dependencies.settings);
 
   await dependencies.recorder.markStarted({

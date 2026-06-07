@@ -6,8 +6,16 @@ import {
   type StepRunEvaluator
 } from "../generated/prisma/client.js";
 import { prisma } from "../db/prisma.js";
+import { env } from "../config/env.js";
 import type { ExecuteStepRunWithCodexInput } from "./codex-step-executor.js";
 import { executeStepRunWithCodex } from "./execute-step-run-with-codex.js";
+import {
+  acceptProducedArtifacts,
+  prepareCodexRuntimeContext,
+  persistDeclaredOutputArtifacts,
+  stepNeedsArtifactRuntime,
+  type ArtifactRuntimeClient
+} from "./artifact-runtime.js";
 import {
   evaluateStepArtifact,
   type EvaluatorDecision,
@@ -31,6 +39,7 @@ type ReadyStepRun = {
   evaluator: StepRunEvaluator;
   workflowRun: {
     workflowVersion: {
+      workflowId: string;
       yamlSnapshot: string;
       contentHash: string;
     };
@@ -53,13 +62,14 @@ type StepRunnerClient = {
   decisionEvent: {
     create(args: Prisma.DecisionEventCreateArgs): PromiseLike<unknown>;
   };
-};
+} & Partial<ArtifactRuntimeClient>;
 
 export type StepRunnerDependencies = {
   client?: StepRunnerClient;
   executeStepRun?: (input: ExecuteStepRunWithCodexInput) => Promise<unknown>;
   evaluateStep?: (input: EvaluateStepInput) => Promise<EvaluatorDecision>;
   resolveWorkingDirectory?: () => string | Promise<string>;
+  resolveArtifactStoreRoot?: () => string | Promise<string>;
   now?: () => Date;
 };
 
@@ -67,10 +77,20 @@ function defaultWorkingDirectory() {
   return path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 }
 
+function defaultArtifactStoreRoot() {
+  const workerRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+  return path.resolve(workerRoot, env.ARTIFACT_STORE_ROOT);
+}
+
 function serializeError(error: unknown): Prisma.InputJsonValue {
   if (error instanceof Error) {
+    const code =
+      "code" in error && typeof (error as { code?: unknown }).code === "string"
+        ? (error as { code: string }).code
+        : "step_runner_error";
+
     return {
-      code: "step_runner_error",
+      code,
       message: error.message
     };
   }
@@ -229,6 +249,14 @@ async function completeWorkflowRun(
   });
 }
 
+function requireArtifactRuntimeClient(client: StepRunnerClient): ArtifactRuntimeClient {
+  if (!client.artifactVersion || !client.stepRunArtifactInput || !client.contextPathEvent) {
+    throw new Error("Artifact runtime requires artifactVersion, stepRunArtifactInput, and contextPathEvent clients");
+  }
+
+  return client as ArtifactRuntimeClient;
+}
+
 export async function runNextReadyStep(
   dependencies: StepRunnerDependencies = {}
 ): Promise<StepRunnerResult> {
@@ -238,6 +266,8 @@ export async function runNextReadyStep(
   const evaluateStep = dependencies.evaluateStep ?? evaluateStepArtifact;
   const resolveWorkingDirectory =
     dependencies.resolveWorkingDirectory ?? defaultWorkingDirectory;
+  const resolveArtifactStoreRoot =
+    dependencies.resolveArtifactStoreRoot ?? defaultArtifactStoreRoot;
   const now = dependencies.now ?? (() => new Date());
 
   const stepRun = await client.stepRun.findFirst({
@@ -281,10 +311,39 @@ export async function runNextReadyStep(
     }
 
     await markWorkflowRunRunning(client, stepRun.workflowRunId, now());
+    const workingDirectory = await resolveWorkingDirectory();
+    const artifactStoreRoot = await resolveArtifactStoreRoot();
+    const artifactClient = stepNeedsArtifactRuntime(step)
+      ? requireArtifactRuntimeClient(client)
+      : undefined;
+    const runtimeContext = artifactClient
+      ? await prepareCodexRuntimeContext({
+          client: artifactClient,
+          workflowId: stepRun.workflowRun.workflowVersion.workflowId,
+          workflowRunId: stepRun.workflowRunId,
+          stepRunId: stepRun.id,
+          step,
+          workingDirectory,
+          artifactStoreRoot
+        })
+      : undefined;
+
     await executeStepRun({
       stepRunId: stepRun.id,
-      workingDirectory: await resolveWorkingDirectory()
+      workingDirectory,
+      ...(runtimeContext ? { runtimeContext } : {})
     });
+
+    if (runtimeContext && runtimeContext.outputArtifacts.length > 0 && artifactClient) {
+      await persistDeclaredOutputArtifacts({
+        client: artifactClient,
+        workflowId: stepRun.workflowRun.workflowVersion.workflowId,
+        workflowRunId: stepRun.workflowRunId,
+        stepRunId: stepRun.id,
+        artifactStoreRoot,
+        outputArtifacts: runtimeContext.outputArtifacts
+      });
+    }
 
     const decision = await evaluateStep({
       stepRunId: stepRun.id,
@@ -298,6 +357,14 @@ export async function runNextReadyStep(
 
     if (decision.verdict !== DecisionVerdict.APPROVE) {
       throw new Error(`Unsupported evaluator verdict for MVP: ${decision.verdict}`);
+    }
+
+    if (artifactClient) {
+      await acceptProducedArtifacts({
+        client: artifactClient,
+        stepRunId: stepRun.id,
+        now: now()
+      });
     }
 
     await markStepRunAccepted(client, stepRun.id, now());

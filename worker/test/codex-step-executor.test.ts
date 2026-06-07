@@ -1,3 +1,4 @@
+import path from "node:path";
 import type {
   ThreadEvent,
   ThreadOptions,
@@ -15,6 +16,7 @@ import type {
   RecordedCodexEvent
 } from "../src/codex/codex-run-recorder.js";
 import {
+  buildCodexRuntimePrompt,
   executeStepRunWithCodexCore,
   type CodexExecutorDependencies
 } from "../src/runtime/codex-step-executor.js";
@@ -246,6 +248,51 @@ describe("executeStepRunWithCodexCore", () => {
     });
     expect(recorder.failed).toBeUndefined();
     expect(result.threadId).toBe("thread-1");
+  });
+
+  it("adds the runtime artifact contract when declared outputs are present", async () => {
+    const recorder = new MemoryRecorder(
+      sourceFor("Write obsolete.md and extra.md, then finish.")
+    );
+    const gateway = new FakeGateway(() => eventStream(...successfulEvents()));
+
+    await executeStepRunWithCodexCore(
+      {
+        stepRunId: "step-run-artifacts",
+        workingDirectory: process.cwd(),
+        runtimeContext: {
+          contextPaths: [],
+          inputArtifacts: [],
+          outputArtifacts: [
+            {
+              artifact: "declared_report",
+              filename: "declared-report.md",
+              absolutePath: path.join(process.cwd(), ".workflow-runtime", "declared-report.md"),
+              promptPath: ".workflow-runtime/declared-report.md"
+            }
+          ]
+        }
+      },
+      dependencies(recorder, gateway)
+    );
+
+    expect(gateway.requests[0]?.prompt).toContain(
+      "Declared output artifacts are authoritative"
+    );
+    expect(gateway.requests[0]?.prompt).toContain("declared_report");
+    expect(gateway.requests[0]?.prompt).toContain(".workflow-runtime/declared-report.md");
+    expect(gateway.requests[0]?.prompt).toContain("obsolete.md");
+    expect(recorder.started?.promptSnapshot).toBe(gateway.requests[0]?.prompt);
+  });
+
+  it("leaves prompts unchanged when the runtime context is empty", () => {
+    expect(
+      buildCodexRuntimePrompt("Use the plain prompt.", {
+        contextPaths: [],
+        inputArtifacts: [],
+        outputArtifacts: []
+      })
+    ).toBe("Use the plain prompt.");
   });
 
   it("rejects an empty published prompt before starting Codex", async () => {

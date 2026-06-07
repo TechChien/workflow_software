@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -17,6 +18,7 @@ import {
   PrismaCodexRunRecorder,
   type PrismaCodexRunRecorderClient
 } from "../src/codex/prisma-codex-run-recorder.js";
+import { readArtifactVersionContent } from "../src/artifacts/artifact-store.js";
 import { executeStepRunWithCodexCore } from "../src/runtime/codex-step-executor.js";
 import { runNextReadyStep, type StepRunnerDependencies } from "../src/runtime/step-runner.js";
 import { canonicalizeWorkflowDefinition } from "../src/runtime/workflow-definition.js";
@@ -25,7 +27,13 @@ import { startPoller } from "../src/worker/poller.js";
 type StepRunnerClient = NonNullable<StepRunnerDependencies["client"]>;
 type DbClient = StepRunnerClient & PrismaCodexRunRecorderClient & Pick<
   PrismaClient,
-  "workflow" | "workflowVersion" | "workflowRun" | "stepRun"
+  | "workflow"
+  | "workflowVersion"
+  | "workflowRun"
+  | "stepRun"
+  | "artifactVersion"
+  | "stepRunArtifactInput"
+  | "contextPathEvent"
 >;
 
 class RollbackIntegrationTransaction extends Error {
@@ -139,6 +147,128 @@ async function createTwoStepWorkflowRun(client: DbClient) {
   };
 }
 
+async function createTwoStepArtifactWorkflowRun(
+  client: DbClient,
+  input: {
+    firstToken: string;
+    contextPath: string;
+  }
+) {
+  const firstStepId = `step-${randomUUID()}`;
+  const secondStepId = `step-${randomUUID()}`;
+  const firstArtifactKey = `artifact_${randomUUID().replace(/-/g, "_")}`;
+  const secondArtifactKey = `artifact_${randomUUID().replace(/-/g, "_")}`;
+  const snapshot = canonicalizeWorkflowDefinition({
+    id: `workflow-${randomUUID()}`,
+    name: "Artifact Codex integration workflow",
+    version: "0.1.0",
+    inputs: {},
+    artifacts: {},
+    steps: [
+      {
+        id: firstStepId,
+        type: "code_agent",
+        downstream: secondStepId,
+        input_artifacts: [],
+        output_artifacts: [
+          {
+            artifact: firstArtifactKey,
+            filename: "declared-step-one.md"
+          }
+        ],
+        context_paths: [],
+        tool_capabilities: [],
+        evaluate: { evaluator: "mixed" },
+        prompt: [
+          "Create the artifact content requested by the runtime contract.",
+          "This prompt incorrectly mentions stale-step-one.md and extra-step-one.md; ignore those filenames if the runtime contract declares another output.",
+          `The declared artifact content must contain this marker exactly once: ${input.firstToken}`,
+          "Reply exactly STEP_1_ARTIFACT_DONE."
+        ].join("\n"),
+        acceptance: { criteria: [] }
+      },
+      {
+        id: secondStepId,
+        type: "code_agent",
+        upstream: firstStepId,
+        input_artifacts: [
+          {
+            artifact: firstArtifactKey
+          }
+        ],
+        output_artifacts: [
+          {
+            artifact: secondArtifactKey,
+            filename: "declared-step-two.md"
+          }
+        ],
+        context_paths: [
+          {
+            path: input.contextPath,
+            type: "file",
+            optional: false
+          }
+        ],
+        tool_capabilities: [],
+        evaluate: { evaluator: "mixed" },
+        prompt: [
+          "Read the input artifact and context file listed in the runtime contract.",
+          "Write the declared output artifact with the marker from the input artifact and the marker from the context file.",
+          "This prompt incorrectly mentions second-extra-a.md and second-extra-b.md; ignore filenames not declared by the runtime contract.",
+          "Reply exactly STEP_2_ARTIFACT_DONE."
+        ].join("\n"),
+        acceptance: { criteria: [] }
+      }
+    ],
+    ui: {}
+  });
+
+  const workflow = await client.workflow.create({
+    data: {
+      name: snapshot.definition.name,
+      draftYaml: snapshot.yaml
+    }
+  });
+  const version = await client.workflowVersion.create({
+    data: {
+      workflowId: workflow.id,
+      revision: 1,
+      yamlSnapshot: snapshot.yaml,
+      contentHash: snapshot.contentHash
+    }
+  });
+  const workflowRun = await client.workflowRun.create({
+    data: {
+      workflowVersionId: version.id
+    }
+  });
+  const firstStepRun = await client.stepRun.create({
+    data: {
+      workflowRunId: workflowRun.id,
+      stepId: firstStepId,
+      status: "READY",
+      evaluator: StepRunEvaluator.MIXED
+    }
+  });
+  const secondStepRun = await client.stepRun.create({
+    data: {
+      workflowRunId: workflowRun.id,
+      stepId: secondStepId,
+      status: "PENDING",
+      evaluator: StepRunEvaluator.MIXED,
+      upstreamStepRunId: firstStepRun.id
+    }
+  });
+
+  return {
+    workflowId: workflow.id,
+    workflowRunId: workflowRun.id,
+    stepRunIds: [firstStepRun.id, secondStepRun.id],
+    firstArtifactKey,
+    secondArtifactKey
+  };
+}
+
 async function stepStatuses(client: DbClient, workflowRunId: string) {
   const steps = await client.stepRun.findMany({
     where: { workflowRunId },
@@ -161,7 +291,7 @@ async function workflowStatus(client: DbClient, workflowRunId: string) {
   return workflowRun.status;
 }
 
-async function pollWorkflowRun(client: DbClient, workflowRunId: string) {
+async function pollWorkflowRun(client: DbClient, workflowRunId: string, artifactStoreRoot?: string) {
   console.log(
     `[poller] before workflow=${await workflowStatus(client, workflowRunId)} steps=${await stepStatuses(client, workflowRunId)}`
   );
@@ -184,7 +314,8 @@ async function pollWorkflowRun(client: DbClient, workflowRunId: string) {
       source: DecisionSource.EVALUATOR,
       verdict: DecisionVerdict.APPROVE
     }),
-    resolveWorkingDirectory: () => repoRoot
+    resolveWorkingDirectory: () => repoRoot,
+    ...(artifactStoreRoot ? { resolveArtifactStoreRoot: () => artifactStoreRoot } : {})
   });
 
   console.log(
@@ -298,5 +429,116 @@ describeIntegration("startPoller Codex integration", () => {
       ).resolves.toEqual([]);
     },
     integrationTimeoutMs + 20_000
+  );
+
+  it(
+    "passes declared artifacts between two real Codex steps, then rolls back DB changes",
+    async () => {
+      const prisma = await loadPrisma();
+      const artifactStoreRoot = path.join(
+        repoRoot,
+        ".codex-integration-artifacts",
+        randomUUID()
+      );
+      const contextDirectory = path.join(
+        repoRoot,
+        ".codex-integration-context",
+        randomUUID()
+      );
+      const contextFile = path.join(contextDirectory, "context-marker.md");
+      const firstToken = `STEP_ONE_INPUT_${randomUUID()}`;
+      const contextToken = `CONTEXT_INPUT_${randomUUID()}`;
+      let workflowId: string | undefined;
+      let workflowRunId: string | undefined;
+      let stepRunIds: string[] = [];
+
+      await mkdir(contextDirectory, { recursive: true });
+      await writeFile(contextFile, `Context marker: ${contextToken}\n`, "utf8");
+
+      try {
+        await prisma.$transaction(
+          async (tx) => {
+            const client = tx as unknown as DbClient;
+            const created = await createTwoStepArtifactWorkflowRun(client, {
+              firstToken,
+              contextPath: path.relative(repoRoot, contextFile).replace(/\\/g, "/")
+            });
+            workflowId = created.workflowId;
+            workflowRunId = created.workflowRunId;
+            stepRunIds = created.stepRunIds;
+
+            await expect(
+              pollWorkflowRun(client, created.workflowRunId, artifactStoreRoot)
+            ).resolves.toMatchObject({ picked: true, outcome: "accepted" });
+            await expect(
+              pollWorkflowRun(client, created.workflowRunId, artifactStoreRoot)
+            ).resolves.toMatchObject({ picked: true, outcome: "accepted" });
+
+            expect(await workflowStatus(client, created.workflowRunId)).toBe("COMPLETED");
+
+            const secondArtifact = await client.artifactVersion.findFirst({
+              where: {
+                workflowRunId: created.workflowRunId,
+                artifactKey: created.secondArtifactKey,
+                status: "ACCEPTED"
+              },
+              orderBy: {
+                version: "desc"
+              }
+            });
+            expect(secondArtifact).not.toBeNull();
+
+            const stored = await readArtifactVersionContent({
+              root: artifactStoreRoot,
+              workflowId: created.workflowId,
+              runId: created.workflowRunId,
+              artifactKey: created.secondArtifactKey,
+              version: secondArtifact?.version ?? 0
+            });
+            expect(stored.content).toContain(firstToken);
+            expect(stored.content).toContain(contextToken);
+
+            throw new RollbackIntegrationTransaction();
+          },
+          {
+            maxWait: 10_000,
+            timeout: integrationTimeoutMs + 20_000
+          }
+        );
+      } catch (error) {
+        if (!(error instanceof RollbackIntegrationTransaction)) {
+          throw error;
+        }
+      } finally {
+        await rm(artifactStoreRoot, { recursive: true, force: true });
+        await rm(contextDirectory, { recursive: true, force: true });
+        await Promise.all(
+          stepRunIds.map((stepRunId) =>
+            rm(path.join(repoRoot, ".workflow-runtime", "artifacts", stepRunId), {
+              recursive: true,
+              force: true
+            })
+          )
+        );
+      }
+
+      expect(workflowRunId).toEqual(expect.any(String));
+      await expect(
+        prisma.workflowRun.findUnique({
+          where: { id: workflowRunId }
+        })
+      ).resolves.toBeNull();
+      await expect(
+        prisma.artifactVersion.findMany({
+          where: { workflowRunId }
+        })
+      ).resolves.toEqual([]);
+      await expect(
+        prisma.workflow.findUnique({
+          where: { id: workflowId }
+        })
+      ).resolves.toBeNull();
+    },
+    integrationTimeoutMs + 40_000
   );
 });

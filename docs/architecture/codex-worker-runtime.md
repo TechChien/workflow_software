@@ -4,11 +4,41 @@
 
 `WorkflowVersion.yamlSnapshot` is the immutable design source for `steps[].prompt`.
 Before a Codex turn starts, the worker verifies the snapshot hash, resolves the
-matching `stepId`, rejects empty prompts, and copies the exact submitted prompt to
-`StepRun.promptSnapshot`.
+matching `stepId`, and rejects empty prompts.
+
+When a step has no runtime context, the exact submitted prompt is copied to
+`StepRun.promptSnapshot`. When a step declares `context_paths`, `input_artifacts`,
+or `output_artifacts`, the worker wraps the submitted prompt with a runtime
+contract and stores that effective prompt in `StepRun.promptSnapshot`.
 
 `CodexInteractionEvent` is not a prompt source. It is an ordered, reduced event
 ledger for a running Codex turn.
+
+## Artifact contract
+
+`steps[].output_artifacts` is authoritative. Prompt-mentioned filenames are
+instructions only when they match the declared outputs. If the prompt names a
+different output file, asks for extra files, or omits the declared filenames, the
+worker still instructs Codex to write only the declared artifact files.
+
+Before the Codex turn, the runner stages paths under:
+
+```txt
+.workflow-runtime/artifacts/<stepRunId>/
+  inputs/<artifactKey>/
+  outputs/<declared filename>
+```
+
+Accepted upstream artifacts are materialized into `inputs/` and passed to Codex
+as input artifact paths. Resolved `context_paths` are passed as context paths.
+Declared outputs are passed as exact output paths.
+
+After Codex completes, the runner reads only the declared output paths. Extra
+files are ignored as workspace side effects. If any declared output is missing,
+the step fails with `artifact_output_missing` and downstream steps are not readied.
+When all declared outputs exist, the runner writes `ArtifactVersion` rows as
+`CANDIDATE`; after the evaluator approves, those versions become `ACCEPTED` and
+can be consumed by downstream `input_artifacts`.
 
 ## SDK usage
 
