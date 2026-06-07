@@ -44,6 +44,12 @@ Install dependencies:
 pnpm install
 ```
 
+or
+
+```bash
+pnpm install --frozen-lockfile
+```
+
 Start local PostgreSQL:
 
 ```bash
