@@ -1,0 +1,78 @@
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { tmpdir } from "node:os";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { resolveContextPath } from "../src/context/context-path-resolver.js";
+
+describe("resolveContextPath", () => {
+  let root: string;
+  let workingDirectory: string;
+  let externalDirectory: string;
+
+  beforeEach(async () => {
+    root = await mkdtemp(path.join(tmpdir(), "workflow-context-path-"));
+    workingDirectory = path.join(root, "worktree");
+    externalDirectory = path.join(root, "external-context");
+
+    await mkdir(workingDirectory, { recursive: true });
+    await mkdir(externalDirectory, { recursive: true });
+  });
+
+  afterEach(async () => {
+    await rm(root, { recursive: true, force: true });
+  });
+
+  it("resolves an absolute file path outside the working directory", async () => {
+    const externalFile = path.join(externalDirectory, "notes.md");
+    await writeFile(externalFile, "external context", "utf8");
+
+    await expect(
+      resolveContextPath(workingDirectory, {
+        path: externalFile,
+        type: "file",
+        optional: false
+      })
+    ).resolves.toEqual({
+      path: externalFile,
+      type: "file",
+      optional: false,
+      status: "resolved",
+      absolutePath: externalFile
+    });
+  });
+
+  it("resolves a relative directory path outside the working directory", async () => {
+    await expect(
+      resolveContextPath(workingDirectory, {
+        path: "../external-context",
+        type: "directory",
+        optional: false
+      })
+    ).resolves.toEqual({
+      path: "../external-context",
+      type: "directory",
+      optional: false,
+      status: "resolved",
+      absolutePath: externalDirectory
+    });
+  });
+
+  it("still rejects paths with the wrong declared type", async () => {
+    const externalFile = path.join(externalDirectory, "notes.md");
+    await writeFile(externalFile, "external context", "utf8");
+
+    await expect(
+      resolveContextPath(workingDirectory, {
+        path: externalFile,
+        type: "directory",
+        optional: true
+      })
+    ).resolves.toMatchObject({
+      path: externalFile,
+      type: "directory",
+      optional: true,
+      status: "skipped",
+      reason: "path_type_mismatch"
+    });
+  });
+});

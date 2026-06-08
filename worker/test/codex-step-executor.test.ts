@@ -16,6 +16,7 @@ import type {
   RecordedCodexEvent
 } from "../src/codex/codex-run-recorder.js";
 import {
+  buildCodexAdditionalDirectories,
   buildCodexRuntimePrompt,
   executeStepRunWithCodexCore,
   type CodexExecutorDependencies
@@ -285,6 +286,54 @@ describe("executeStepRunWithCodexCore", () => {
     expect(recorder.started?.promptSnapshot).toBe(gateway.requests[0]?.prompt);
   });
 
+  it("passes context paths as additional Codex directories", async () => {
+    const recorder = new MemoryRecorder(sourceFor("Read the provided context."));
+    const gateway = new FakeGateway(() => eventStream(...successfulEvents()));
+    const notesFile = path.join(process.cwd(), "docs", "notes.md");
+    const srcDirectory = path.join(process.cwd(), "src");
+
+    await executeStepRunWithCodexCore(
+      {
+        stepRunId: "step-run-context",
+        workingDirectory: process.cwd(),
+        runtimeContext: {
+          contextPaths: [
+            {
+              path: "docs/notes.md",
+              type: "file",
+              absolutePath: notesFile,
+              promptPath: "docs/notes.md"
+            },
+            {
+              path: "src",
+              type: "directory",
+              absolutePath: srcDirectory,
+              promptPath: "src"
+            },
+            {
+              path: "docs/notes-copy.md",
+              type: "file",
+              absolutePath: path.join(process.cwd(), "docs", "notes-copy.md"),
+              promptPath: "docs/notes-copy.md"
+            }
+          ],
+          inputArtifacts: [],
+          outputArtifacts: []
+        }
+      },
+      dependencies(recorder, gateway)
+    );
+
+    expect(gateway.requests[0]?.threadOptions.additionalDirectories).toEqual([
+      path.dirname(notesFile),
+      srcDirectory
+    ]);
+    expect(recorder.started?.codexOptions.additionalDirectories).toEqual([
+      path.dirname(notesFile),
+      srcDirectory
+    ]);
+  });
+
   it("leaves prompts unchanged when the runtime context is empty", () => {
     expect(
       buildCodexRuntimePrompt("Use the plain prompt.", {
@@ -293,6 +342,23 @@ describe("executeStepRunWithCodexCore", () => {
         outputArtifacts: []
       })
     ).toBe("Use the plain prompt.");
+  });
+
+  it("returns no additional directories when runtime context has no context paths", () => {
+    expect(
+      buildCodexAdditionalDirectories({
+        contextPaths: [],
+        inputArtifacts: [],
+        outputArtifacts: [
+          {
+            artifact: "declared_report",
+            filename: "declared-report.md",
+            absolutePath: path.join(process.cwd(), ".workflow-runtime", "declared-report.md"),
+            promptPath: ".workflow-runtime/declared-report.md"
+          }
+        ]
+      })
+    ).toEqual([]);
   });
 
   it("rejects an empty published prompt before starting Codex", async () => {

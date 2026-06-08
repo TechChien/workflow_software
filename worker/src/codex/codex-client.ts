@@ -52,11 +52,15 @@ export function buildCodexClientOptions(input: { apiKey?: string; baseUrl?: stri
 
 export function buildCodexThreadOptions(
   workingDirectory: string,
-  settings: Pick<CodexRuntimeSettings, "model" | "modelReasoningEffort">
+  settings: Pick<CodexRuntimeSettings, "model" | "modelReasoningEffort">,
+  input: { additionalDirectories?: string[] } = {}
 ): ThreadOptions {
   return {
     ...CODEX_THREAD_POLICY,
     workingDirectory,
+    ...(input.additionalDirectories?.length
+      ? { additionalDirectories: input.additionalDirectories }
+      : {}),
     ...(settings.model ? { model: settings.model } : {}),
     ...(settings.modelReasoningEffort
       ? { modelReasoningEffort: settings.modelReasoningEffort }
@@ -71,6 +75,9 @@ export function buildCodexOptionsSnapshot(threadOptions: ThreadOptions): Record<
     approvalPolicy: threadOptions.approvalPolicy,
     networkAccessEnabled: threadOptions.networkAccessEnabled,
     webSearchMode: threadOptions.webSearchMode,
+    ...(threadOptions.additionalDirectories
+      ? { additionalDirectories: threadOptions.additionalDirectories }
+      : {}),
     ...(threadOptions.model ? { model: threadOptions.model } : {}),
     ...(threadOptions.modelReasoningEffort
       ? { modelReasoningEffort: threadOptions.modelReasoningEffort }

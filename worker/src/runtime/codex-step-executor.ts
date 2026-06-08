@@ -142,6 +142,24 @@ export function buildCodexRuntimePrompt(
   ].join("\n");
 }
 
+export function buildCodexAdditionalDirectories(
+  context: CodexRuntimePromptContext | undefined
+) {
+  if (!context?.contextPaths.length) {
+    return [];
+  }
+
+  return [
+    ...new Set(
+      context.contextPaths.map((contextPath) =>
+        contextPath.type === "directory"
+          ? contextPath.absolutePath
+          : path.dirname(contextPath.absolutePath)
+      )
+    )
+  ];
+}
+
 async function assertWorkingDirectory(workingDirectory: string) {
   if (!path.isAbsolute(workingDirectory)) {
     throw new CodexExecutionError(
@@ -268,7 +286,9 @@ export async function executeStepRunWithCodexCore(
   const source = await dependencies.recorder.loadSource(input.stepRunId);
   const { prompt: workflowPrompt } = resolveCodexStepPrompt(source);
   const prompt = buildCodexRuntimePrompt(workflowPrompt, input.runtimeContext);
-  const threadOptions = buildCodexThreadOptions(input.workingDirectory, dependencies.settings);
+  const threadOptions = buildCodexThreadOptions(input.workingDirectory, dependencies.settings, {
+    additionalDirectories: buildCodexAdditionalDirectories(input.runtimeContext)
+  });
 
   await dependencies.recorder.markStarted({
     stepRunId: input.stepRunId,

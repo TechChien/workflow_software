@@ -30,8 +30,10 @@ Before the Codex turn, the runner stages paths under:
 ```
 
 Accepted upstream artifacts are materialized into `inputs/` and passed to Codex
-as input artifact paths. Resolved `context_paths` are passed as context paths.
-Declared outputs are passed as exact output paths.
+as input artifact paths. Resolved `context_paths` may point inside or outside the
+working directory; they are passed as context paths and their directories are
+added to Codex `additionalDirectories`. Declared outputs are passed as exact
+output paths.
 
 After Codex completes, the runner reads only the declared output paths. Extra
 files are ignored as workspace side effects. If any declared output is missing,

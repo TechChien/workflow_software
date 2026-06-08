@@ -64,10 +64,10 @@ class FakeArtifactRuntimeDb {
             status: String(args.data.status),
             contentUri: args.data.contentUri,
             contentHash: args.data.contentHash,
-            producerStepRunId: args.data.producerStepRunId,
+            producerStepRunId: args.data.producerStepRunId!,
             parentVersionId: args.data.parentVersionId ?? null,
             acceptedAt: null,
-            workflowRunId: args.data.workflowRunId
+            workflowRunId: args.data.workflowRunId!
           };
           this.artifactVersions.push(row);
           return row;
@@ -93,9 +93,9 @@ class FakeArtifactRuntimeDb {
       stepRunArtifactInput: {
         create: async (args) => {
           this.stepRunInputs.push({
-            stepRunId: args.data.stepRunId,
+            stepRunId: args.data.stepRunId!,
             artifactKey: args.data.artifactKey,
-            artifactVersionId: args.data.artifactVersionId
+            artifactVersionId: args.data.artifactVersionId!
           });
           return args.data;
         }
@@ -103,7 +103,7 @@ class FakeArtifactRuntimeDb {
       contextPathEvent: {
         create: async (args) => {
           this.contextPathEvents.push({
-            stepRunId: args.data.stepRunId,
+            stepRunId: args.data.stepRunId!,
             path: args.data.path,
             type: args.data.type,
             status: args.data.status,

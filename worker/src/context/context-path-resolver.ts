@@ -20,13 +20,7 @@ export async function resolveContextPath(
   worktreeRoot: string,
   contextPath: ContextPath
 ): Promise<ResolvedContextPath> {
-  const root = path.resolve(worktreeRoot);
-  const absolutePath = path.resolve(root, contextPath.path);
-  const relative = path.relative(root, absolutePath);
-
-  if (relative.startsWith("..") || path.isAbsolute(relative)) {
-    return { ...contextPath, status: "skipped", reason: "path_escapes_worktree" };
-  }
+  const absolutePath = path.resolve(worktreeRoot, contextPath.path);
 
   try {
     const info = await stat(absolutePath);

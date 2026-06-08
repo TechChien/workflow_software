@@ -173,7 +173,8 @@ async function createTwoStepArtifactWorkflowRun(
         output_artifacts: [
           {
             artifact: firstArtifactKey,
-            filename: "declared-step-one.md"
+            filename: "declared-step-one.md",
+            format: "markdown"
           }
         ],
         context_paths: [],
@@ -193,13 +194,15 @@ async function createTwoStepArtifactWorkflowRun(
         upstream: firstStepId,
         input_artifacts: [
           {
-            artifact: firstArtifactKey
+            artifact: firstArtifactKey,
+            required: true,
           }
         ],
         output_artifacts: [
           {
             artifact: secondArtifactKey,
-            filename: "declared-step-two.md"
+            filename: "declared-step-two.md",
+            format: "plain_text"
           }
         ],
         context_paths: [
