@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import {
   DecisionVerdict,
   type Prisma,
-  type StepRunEvaluator
+  type StepRunEvaluator,
 } from "../generated/prisma/client.js";
 import { prisma } from "../db/prisma.js";
 import { env } from "../config/env.js";
@@ -13,13 +13,15 @@ import {
   acceptProducedArtifacts,
   prepareCodexRuntimeContext,
   persistDeclaredOutputArtifacts,
+  rejectProducedArtifacts,
   stepNeedsArtifactRuntime,
-  type ArtifactRuntimeClient
+  type ArtifactRuntimeClient,
 } from "./artifact-runtime.js";
 import {
   evaluateStepArtifact,
+  type EvaluateStepInput,
+  type EvaluateStepResult,
   type EvaluatorDecision,
-  type EvaluateStepInput
 } from "./evaluator-runner.js";
 import { parseVerifiedWorkflowSnapshot } from "./workflow-definition.js";
 
@@ -49,16 +51,22 @@ type ReadyStepRun = {
 
 type StepRunnerClient = {
   stepRun: {
-    findFirst(args: Prisma.StepRunFindFirstArgs): PromiseLike<ReadyStepRun | null>;
+    findFirst(
+      args: Prisma.StepRunFindFirstArgs,
+    ): PromiseLike<ReadyStepRun | null>;
     findUnique(args: Prisma.StepRunFindUniqueArgs): PromiseLike<{
       status: string;
       codexError: Prisma.JsonValue | null;
     } | null>;
     update(args: Prisma.StepRunUpdateArgs): PromiseLike<unknown>;
-    updateMany(args: Prisma.StepRunUpdateManyArgs): PromiseLike<{ count: number }>;
+    updateMany(
+      args: Prisma.StepRunUpdateManyArgs,
+    ): PromiseLike<{ count: number }>;
   };
   workflowRun: {
-    updateMany(args: Prisma.WorkflowRunUpdateManyArgs): PromiseLike<{ count: number }>;
+    updateMany(
+      args: Prisma.WorkflowRunUpdateManyArgs,
+    ): PromiseLike<{ count: number }>;
   };
   codeWorkspace: {
     findFirst(args: Prisma.CodeWorkspaceFindFirstArgs): PromiseLike<{
@@ -79,14 +87,20 @@ export type StepWorkingDirectoryInput = {
 export type StepRunnerDependencies = {
   client?: StepRunnerClient;
   executeStepRun?: (input: ExecuteStepRunWithCodexInput) => Promise<unknown>;
-  evaluateStep?: (input: EvaluateStepInput) => Promise<EvaluatorDecision>;
-  resolveWorkingDirectory?: (input: StepWorkingDirectoryInput) => string | Promise<string>;
+  evaluateStep?: (input: EvaluateStepInput) => Promise<EvaluateStepResult>;
+  resolveWorkingDirectory?: (
+    input: StepWorkingDirectoryInput,
+  ) => string | Promise<string>;
   resolveArtifactStoreRoot?: () => string | Promise<string>;
   now?: () => Date;
 };
 
 function defaultArtifactStoreRoot() {
-  const workerRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+  const workerRoot = path.resolve(
+    path.dirname(fileURLToPath(import.meta.url)),
+    "..",
+    "..",
+  );
   return path.resolve(workerRoot, env.ARTIFACT_STORE_ROOT);
 }
 
@@ -99,14 +113,27 @@ function serializeError(error: unknown): Prisma.InputJsonValue {
 
     return {
       code,
-      message: error.message
+      message: error.message,
     };
   }
 
   return {
     code: "step_runner_error",
-    message: String(error)
+    message: String(error),
   };
+}
+
+function extractCodexFinalResponse(result: unknown) {
+  if (
+    result &&
+    typeof result === "object" &&
+    "finalResponse" in result &&
+    typeof (result as { finalResponse?: unknown }).finalResponse === "string"
+  ) {
+    return (result as { finalResponse: string }).finalResponse;
+  }
+
+  return undefined;
 }
 
 function isReadyRaceError(error: unknown) {
@@ -116,36 +143,36 @@ function isReadyRaceError(error: unknown) {
 async function markWorkflowRunRunning(
   client: StepRunnerClient,
   workflowRunId: string,
-  now: Date
+  now: Date,
 ) {
   await client.workflowRun.updateMany({
     where: {
       id: workflowRunId,
-      status: "PENDING"
+      status: "PENDING",
     },
     data: {
       status: "RUNNING",
-      startedAt: now
-    }
+      startedAt: now,
+    },
   });
 }
 
 async function markWorkflowRunFailed(
   client: StepRunnerClient,
   workflowRunId: string,
-  now: Date
+  now: Date,
 ) {
   await client.workflowRun.updateMany({
     where: {
       id: workflowRunId,
       status: {
-        in: ["PENDING", "RUNNING", "WAITING"]
-      }
+        in: ["PENDING", "RUNNING", "WAITING"],
+      },
     },
     data: {
       status: "FAILED",
-      completedAt: now
-    }
+      completedAt: now,
+    },
   });
 }
 
@@ -153,14 +180,14 @@ async function markStepRunFailed(
   client: StepRunnerClient,
   stepRunId: string,
   error: unknown,
-  now: Date
+  now: Date,
 ) {
   const current = await client.stepRun.findUnique({
     where: { id: stepRunId },
     select: {
       status: true,
-      codexError: true
-    }
+      codexError: true,
+    },
   });
 
   if (!current || (current.status === "FAILED" && current.codexError)) {
@@ -172,25 +199,46 @@ async function markStepRunFailed(
     data: {
       status: "FAILED",
       codexError: current.codexError ?? serializeError(error),
-      completedAt: now
-    }
+      completedAt: now,
+    },
   });
 }
 
 async function markStepRunAccepted(
   client: StepRunnerClient,
   stepRunId: string,
-  now: Date
+  now: Date,
 ) {
   const result = await client.stepRun.updateMany({
     where: {
       id: stepRunId,
-      status: "CODEX_COMPLETED"
+      status: "CODEX_COMPLETED",
     },
     data: {
       status: "ACCEPTED",
-      completedAt: now
-    }
+      completedAt: now,
+    },
+  });
+
+  if (result.count !== 1) {
+    throw new Error(`StepRun ${stepRunId} was not CODEX_COMPLETED`);
+  }
+}
+
+async function markStepRunRejected(
+  client: StepRunnerClient,
+  stepRunId: string,
+  now: Date,
+) {
+  const result = await client.stepRun.updateMany({
+    where: {
+      id: stepRunId,
+      status: "CODEX_COMPLETED",
+    },
+    data: {
+      status: "REJECTED",
+      completedAt: now,
+    },
   });
 
   if (result.count !== 1) {
@@ -204,7 +252,7 @@ async function persistDecision(
     workflowRunId: string;
     stepRunId: string;
     decision: EvaluatorDecision;
-  }
+  },
 ) {
   await client.decisionEvent.create({
     data: {
@@ -212,9 +260,26 @@ async function persistDecision(
       stepRunId: input.stepRunId,
       source: input.decision.source,
       verdict: input.decision.verdict,
-      comment: input.decision.comment
-    }
+      comment: input.decision.comment,
+    },
   });
+}
+
+async function persistDecisions(
+  client: StepRunnerClient,
+  input: {
+    workflowRunId: string;
+    stepRunId: string;
+    decisions: EvaluatorDecision[];
+  },
+) {
+  for (const decision of input.decisions) {
+    await persistDecision(client, {
+      workflowRunId: input.workflowRunId,
+      stepRunId: input.stepRunId,
+      decision,
+    });
+  }
 }
 
 async function readyDownstreamStep(
@@ -222,44 +287,54 @@ async function readyDownstreamStep(
   input: {
     workflowRunId: string;
     downstreamStepId: string;
-  }
+  },
 ) {
   const result = await client.stepRun.updateMany({
     where: {
       workflowRunId: input.workflowRunId,
       stepId: input.downstreamStepId,
-      status: "PENDING"
+      status: "PENDING",
     },
     data: {
-      status: "READY"
-    }
+      status: "READY",
+    },
   });
 
   if (result.count !== 1) {
-    throw new Error(`Downstream StepRun ${input.downstreamStepId} was not PENDING`);
+    throw new Error(
+      `Downstream StepRun ${input.downstreamStepId} was not PENDING`,
+    );
   }
 }
 
 async function completeWorkflowRun(
   client: StepRunnerClient,
   workflowRunId: string,
-  now: Date
+  now: Date,
 ) {
   await client.workflowRun.updateMany({
     where: {
       id: workflowRunId,
-      status: "RUNNING"
+      status: "RUNNING",
     },
     data: {
       status: "COMPLETED",
-      completedAt: now
-    }
+      completedAt: now,
+    },
   });
 }
 
-function requireArtifactRuntimeClient(client: StepRunnerClient): ArtifactRuntimeClient {
-  if (!client.artifactVersion || !client.stepRunArtifactInput || !client.contextPathEvent) {
-    throw new Error("Artifact runtime requires artifactVersion, stepRunArtifactInput, and contextPathEvent clients");
+function requireArtifactRuntimeClient(
+  client: StepRunnerClient,
+): ArtifactRuntimeClient {
+  if (
+    !client.artifactVersion ||
+    !client.stepRunArtifactInput ||
+    !client.contextPathEvent
+  ) {
+    throw new Error(
+      "Artifact runtime requires artifactVersion, stepRunArtifactInput, and contextPathEvent clients",
+    );
   }
 
   return client as ArtifactRuntimeClient;
@@ -267,23 +342,23 @@ function requireArtifactRuntimeClient(client: StepRunnerClient): ArtifactRuntime
 
 async function resolveCodeWorkspaceWorkingDirectory(
   client: StepRunnerClient,
-  input: StepWorkingDirectoryInput
+  input: StepWorkingDirectoryInput,
 ) {
   const workspace = await client.codeWorkspace.findFirst({
     where: input.codeWorkspaceId
       ? {
           id: input.codeWorkspaceId,
-          workflowRunId: input.workflowRunId
+          workflowRunId: input.workflowRunId,
         }
       : {
-          workflowRunId: input.workflowRunId
+          workflowRunId: input.workflowRunId,
         },
     orderBy: {
-      createdAt: "asc"
+      createdAt: "asc",
     },
     select: {
-      worktreePath: true
-    }
+      worktreePath: true,
+    },
   });
 
   if (!workspace) {
@@ -294,7 +369,7 @@ async function resolveCodeWorkspaceWorkingDirectory(
 }
 
 export async function runNextReadyStep(
-  dependencies: StepRunnerDependencies = {}
+  dependencies: StepRunnerDependencies = {},
 ): Promise<StepRunnerResult> {
   const client: StepRunnerClient =
     dependencies.client ?? (prisma as unknown as StepRunnerClient);
@@ -313,18 +388,18 @@ export async function runNextReadyStep(
       status: "READY",
       workflowRun: {
         status: {
-          in: ["PENDING", "RUNNING"]
-        }
-      }
+          in: ["PENDING", "RUNNING"],
+        },
+      },
     },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     include: {
       workflowRun: {
         include: {
-          workflowVersion: true
-        }
-      }
-    }
+          workflowVersion: true,
+        },
+      },
+    },
   });
 
   if (!stepRun) {
@@ -334,25 +409,29 @@ export async function runNextReadyStep(
   const resultBase = {
     picked: true as const,
     stepRunId: stepRun.id,
-    workflowRunId: stepRun.workflowRunId
+    workflowRunId: stepRun.workflowRunId,
   };
 
   try {
     const workflow = parseVerifiedWorkflowSnapshot(
       stepRun.workflowRun.workflowVersion.yamlSnapshot,
-      stepRun.workflowRun.workflowVersion.contentHash
+      stepRun.workflowRun.workflowVersion.contentHash,
     );
-    const step = workflow.steps.find((candidate) => candidate.id === stepRun.stepId);
+    const step = workflow.steps.find(
+      (candidate) => candidate.id === stepRun.stepId,
+    );
 
     if (!step) {
-      throw new Error(`Published workflow snapshot does not contain step ${stepRun.stepId}`);
+      throw new Error(
+        `Published workflow snapshot does not contain step ${stepRun.stepId}`,
+      );
     }
 
     await markWorkflowRunRunning(client, stepRun.workflowRunId, now());
     const workingDirectory = await resolveWorkingDirectory({
       stepRunId: stepRun.id,
       workflowRunId: stepRun.workflowRunId,
-      codeWorkspaceId: stepRun.codeWorkspaceId
+      codeWorkspaceId: stepRun.codeWorkspaceId,
     });
     const artifactStoreRoot = await resolveArtifactStoreRoot();
     const artifactClient = stepNeedsArtifactRuntime(step)
@@ -366,46 +445,71 @@ export async function runNextReadyStep(
           stepRunId: stepRun.id,
           step,
           workingDirectory,
-          artifactStoreRoot
+          artifactStoreRoot,
         })
       : undefined;
 
-    await executeStepRun({
+    const executionResult = await executeStepRun({
       stepRunId: stepRun.id,
       workingDirectory,
-      ...(runtimeContext ? { runtimeContext } : {})
+      ...(runtimeContext ? { runtimeContext } : {}),
     });
 
-    if (runtimeContext && runtimeContext.outputArtifacts.length > 0 && artifactClient) {
+    if (
+      runtimeContext &&
+      runtimeContext.outputArtifacts.length > 0 &&
+      artifactClient
+    ) {
       await persistDeclaredOutputArtifacts({
         client: artifactClient,
         workflowId: stepRun.workflowRun.workflowVersion.workflowId,
         workflowRunId: stepRun.workflowRunId,
         stepRunId: stepRun.id,
         artifactStoreRoot,
-        outputArtifacts: runtimeContext.outputArtifacts
+        outputArtifacts: runtimeContext.outputArtifacts,
       });
     }
 
-    const decision = await evaluateStep({
+    const evaluation = await evaluateStep({
       stepRunId: stepRun.id,
-      evaluator: stepRun.evaluator
+      evaluator: stepRun.evaluator,
+      workflowId: stepRun.workflowRun.workflowVersion.workflowId,
+      workflowRunId: stepRun.workflowRunId,
+      step,
+      workingDirectory,
+      artifactStoreRoot,
+      codexFinalResponse: extractCodexFinalResponse(executionResult),
+      ...(runtimeContext ? { runtimeContext } : {}),
     });
-    await persistDecision(client, {
+    await persistDecisions(client, {
       workflowRunId: stepRun.workflowRunId,
       stepRunId: stepRun.id,
-      decision
+      decisions: evaluation.decisions,
     });
 
-    if (decision.verdict !== DecisionVerdict.APPROVE) {
-      throw new Error(`Unsupported evaluator verdict for MVP: ${decision.verdict}`);
+    if (evaluation.finalVerdict !== DecisionVerdict.APPROVE) {
+      if (artifactClient) {
+        await rejectProducedArtifacts({
+          client: artifactClient,
+          stepRunId: stepRun.id,
+        });
+      }
+
+      const rejectionTime = now();
+      await markStepRunRejected(client, stepRun.id, rejectionTime);
+      await markWorkflowRunFailed(client, stepRun.workflowRunId, rejectionTime);
+
+      return {
+        ...resultBase,
+        outcome: "failed",
+      };
     }
 
     if (artifactClient) {
       await acceptProducedArtifacts({
         client: artifactClient,
         stepRunId: stepRun.id,
-        now: now()
+        now: now(),
       });
     }
 
@@ -414,7 +518,7 @@ export async function runNextReadyStep(
     if (step.downstream) {
       await readyDownstreamStep(client, {
         workflowRunId: stepRun.workflowRunId,
-        downstreamStepId: step.downstream
+        downstreamStepId: step.downstream,
       });
     } else {
       await completeWorkflowRun(client, stepRun.workflowRunId, now());
@@ -422,13 +526,13 @@ export async function runNextReadyStep(
 
     return {
       ...resultBase,
-      outcome: "accepted"
+      outcome: "accepted",
     };
   } catch (error) {
     if (isReadyRaceError(error)) {
       return {
         ...resultBase,
-        outcome: "race_lost"
+        outcome: "race_lost",
       };
     }
 
@@ -438,7 +542,7 @@ export async function runNextReadyStep(
 
     return {
       ...resultBase,
-      outcome: "failed"
+      outcome: "failed",
     };
   }
 }

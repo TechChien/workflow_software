@@ -436,3 +436,18 @@ export async function acceptProducedArtifacts(input: {
     }
   });
 }
+
+export async function rejectProducedArtifacts(input: {
+  client: ArtifactRuntimeClient;
+  stepRunId: string;
+}) {
+  await input.client.artifactVersion.updateMany({
+    where: {
+      producerStepRunId: input.stepRunId,
+      status: "CANDIDATE"
+    },
+    data: {
+      status: "REJECTED"
+    }
+  });
+}

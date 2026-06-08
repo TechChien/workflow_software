@@ -3,11 +3,19 @@ import {
   type CodexOptions,
   type ModelReasoningEffort,
   type ThreadEvent,
-  type ThreadOptions
+  type ThreadOptions,
+  type TurnOptions
 } from "@openai/codex-sdk";
 
 export const CODEX_THREAD_POLICY = {
   sandboxMode: "workspace-write",
+  approvalPolicy: "never",
+  networkAccessEnabled: false,
+  webSearchMode: "disabled"
+} as const satisfies ThreadOptions;
+
+export const CODEX_EVALUATOR_THREAD_POLICY = {
+  sandboxMode: "read-only",
   approvalPolicy: "never",
   networkAccessEnabled: false,
   webSearchMode: "disabled"
@@ -22,6 +30,7 @@ export type CodexRuntimeSettings = {
 export type CodexTurnRequest = {
   prompt: string;
   threadOptions: ThreadOptions;
+  outputSchema?: TurnOptions["outputSchema"];
   signal?: AbortSignal;
 };
 
@@ -34,7 +43,10 @@ export class OpenAICodexGateway implements CodexGateway {
 
   async runTurn(request: CodexTurnRequest): Promise<AsyncIterable<ThreadEvent>> {
     const thread = this.client.startThread(request.threadOptions);
-    const streamed = await thread.runStreamed(request.prompt, { signal: request.signal });
+    const streamed = await thread.runStreamed(request.prompt, {
+      ...(request.outputSchema ? { outputSchema: request.outputSchema } : {}),
+      ...(request.signal ? { signal: request.signal } : {})
+    });
     return streamed.events;
   }
 }
@@ -61,6 +73,20 @@ export function buildCodexThreadOptions(
     ...(input.additionalDirectories?.length
       ? { additionalDirectories: input.additionalDirectories }
       : {}),
+    ...(settings.model ? { model: settings.model } : {}),
+    ...(settings.modelReasoningEffort
+      ? { modelReasoningEffort: settings.modelReasoningEffort }
+      : {})
+  };
+}
+
+export function buildCodexEvaluatorThreadOptions(
+  workingDirectory: string,
+  settings: Pick<CodexRuntimeSettings, "model" | "modelReasoningEffort">
+): ThreadOptions {
+  return {
+    ...CODEX_EVALUATOR_THREAD_POLICY,
+    workingDirectory,
     ...(settings.model ? { model: settings.model } : {}),
     ...(settings.modelReasoningEffort
       ? { modelReasoningEffort: settings.modelReasoningEffort }

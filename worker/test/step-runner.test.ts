@@ -1,3 +1,5 @@
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   DecisionSource,
@@ -5,15 +7,27 @@ import {
   StepRunEvaluator
 } from "../src/generated/prisma/client.js";
 import type { ExecuteStepRunWithCodexInput } from "../src/runtime/codex-step-executor.js";
-import type { EvaluateStepInput, EvaluatorDecision } from "../src/runtime/evaluator-runner.js";
+import type {
+  EvaluateStepInput,
+  EvaluateStepResult,
+  EvaluatorDecision
+} from "../src/runtime/evaluator-runner.js";
 import { runNextReadyStep, type StepRunnerDependencies } from "../src/runtime/step-runner.js";
 import { canonicalizeWorkflowDefinition } from "../src/runtime/workflow-definition.js";
 
 type WorkflowRunStatus = "PENDING" | "RUNNING" | "WAITING" | "COMPLETED" | "FAILED";
-type StepRunStatus = "PENDING" | "READY" | "RUNNING" | "CODEX_COMPLETED" | "ACCEPTED" | "FAILED";
+type StepRunStatus =
+  | "PENDING"
+  | "READY"
+  | "RUNNING"
+  | "CODEX_COMPLETED"
+  | "ACCEPTED"
+  | "REJECTED"
+  | "FAILED";
 
 type WorkflowVersionRow = {
   id: string;
+  workflowId: string;
   yamlSnapshot: string;
   contentHash: string;
 };
@@ -53,6 +67,19 @@ type DecisionEventRow = {
   comment?: string;
 };
 
+type ArtifactVersionRow = {
+  id: string;
+  workflowRunId: string;
+  artifactKey: string;
+  version: number;
+  producerStepRunId: string;
+  parentVersionId?: string | null;
+  status: "CANDIDATE" | "ACCEPTED" | "REJECTED" | "SUPERSEDED" | "STALE";
+  contentUri: string;
+  contentHash: string;
+  acceptedAt?: Date | null;
+};
+
 function statusMatches(actual: string, expected: unknown) {
   if (typeof expected === "string") {
     return actual === expected;
@@ -89,6 +116,7 @@ class FakeRuntimeDb {
     }
   ];
   decisionEvents: DecisionEventRow[] = [];
+  artifactVersions: ArtifactVersionRow[] = [];
 
   constructor(
     steps: Array<{
@@ -99,6 +127,11 @@ class FakeRuntimeDb {
       evaluator: StepRunEvaluator;
       status?: StepRunStatus;
       createdAt?: Date;
+      outputArtifacts?: Array<{
+        artifact: string;
+        filename?: string;
+        format?: "markdown" | "plain_text";
+      }>;
     }>
   ) {
     const snapshot = canonicalizeWorkflowDefinition({
@@ -113,7 +146,7 @@ class FakeRuntimeDb {
         upstream: step.upstream,
         downstream: step.downstream,
         input_artifacts: [],
-        output_artifacts: [],
+        output_artifacts: step.outputArtifacts ?? [],
         context_paths: [],
         tool_capabilities: [],
         evaluate: { evaluator: "mixed" },
@@ -125,6 +158,7 @@ class FakeRuntimeDb {
 
     this.workflowVersion = {
       id: this.workflowRun.workflowVersionId,
+      workflowId: "workflow-1",
       yamlSnapshot: snapshot.yaml,
       contentHash: snapshot.contentHash
     };
@@ -234,6 +268,58 @@ class FakeRuntimeDb {
           this.decisionEvents.push(args.data);
           return args.data;
         }
+      },
+      artifactVersion: {
+        findFirst: async (args: {
+          where: {
+            workflowRunId?: string;
+            artifactKey?: string;
+            status?: string;
+          };
+        }) => {
+          const matches = this.artifactVersions
+            .filter(
+              (artifactVersion) =>
+                (!args.where.workflowRunId ||
+                  artifactVersion.workflowRunId === args.where.workflowRunId) &&
+                (!args.where.artifactKey ||
+                  artifactVersion.artifactKey === args.where.artifactKey) &&
+                (!args.where.status || artifactVersion.status === args.where.status)
+            )
+            .sort((left, right) => right.version - left.version);
+
+          return matches[0] ?? null;
+        },
+        create: async (args: { data: Omit<ArtifactVersionRow, "id"> }) => {
+          const artifactVersion = {
+            ...args.data,
+            id: `artifact-version-${this.artifactVersions.length + 1}`
+          };
+          this.artifactVersions.push(artifactVersion);
+          return artifactVersion;
+        },
+        updateMany: async (args: {
+          where: {
+            producerStepRunId?: string;
+            status?: string;
+          };
+          data: Partial<ArtifactVersionRow>;
+        }) => {
+          const matches = this.artifactVersions.filter(
+            (artifactVersion) =>
+              (!args.where.producerStepRunId ||
+                artifactVersion.producerStepRunId === args.where.producerStepRunId) &&
+              (!args.where.status || artifactVersion.status === args.where.status)
+          );
+          matches.forEach((artifactVersion) => Object.assign(artifactVersion, args.data));
+          return { count: matches.length };
+        }
+      },
+      stepRunArtifactInput: {
+        create: async () => ({})
+      },
+      contextPathEvent: {
+        create: async () => ({})
       }
     } as NonNullable<StepRunnerDependencies["client"]>;
   }
@@ -256,20 +342,70 @@ function createExecutor(db: FakeRuntimeDb, executions: ExecuteStepRunWithCodexIn
       throw new Error(`StepRun ${input.stepRunId} was not READY`);
     }
 
+    if (input.runtimeContext) {
+      for (const outputArtifact of input.runtimeContext.outputArtifacts) {
+        await mkdir(path.dirname(outputArtifact.absolutePath), { recursive: true });
+        await writeFile(
+          outputArtifact.absolutePath,
+          `Artifact content for ${outputArtifact.artifact}`,
+          "utf8"
+        );
+      }
+    }
+
     stepRun.status = "CODEX_COMPLETED";
+    return {
+      stepRunId: input.stepRunId,
+      threadId: "thread-1",
+      finalResponse: "Codex finished successfully.",
+      usage: {
+        input_tokens: 1,
+        cached_input_tokens: 0,
+        output_tokens: 1,
+        reasoning_output_tokens: 0
+      }
+    };
   };
 }
 
+async function makeTempDirectory(prefix: string) {
+  const root = path.resolve(process.cwd(), "..", "data", "test-temp");
+  await mkdir(root, { recursive: true });
+  return mkdtemp(path.join(root, prefix));
+}
+
 function createEvaluator(evaluations: EvaluateStepInput[] = []) {
-  return async (input: EvaluateStepInput): Promise<EvaluatorDecision> => {
+  return async (input: EvaluateStepInput): Promise<EvaluateStepResult> => {
     evaluations.push(input);
-    return {
+
+    const firstDecision: EvaluatorDecision = {
       stepRunId: input.stepRunId,
       source:
         input.evaluator === StepRunEvaluator.HUMAN_REVIEW
           ? DecisionSource.HUMAN
           : DecisionSource.EVALUATOR,
-      verdict: DecisionVerdict.APPROVE
+      verdict: DecisionVerdict.APPROVE,
+      comment: "Approved."
+    };
+
+    if (input.evaluator === StepRunEvaluator.MIXED) {
+      return {
+        decisions: [
+          firstDecision,
+          {
+            stepRunId: input.stepRunId,
+            source: DecisionSource.HUMAN,
+            verdict: DecisionVerdict.APPROVE,
+            comment: "Auto-approved."
+          }
+        ],
+        finalVerdict: DecisionVerdict.APPROVE
+      };
+    }
+
+    return {
+      decisions: [firstDecision],
+      finalVerdict: DecisionVerdict.APPROVE
     };
   };
 }
@@ -334,10 +470,15 @@ describe("runNextReadyStep", () => {
         workingDirectory: "C:\\repo"
       }
     ]);
-    expect(evaluations).toEqual([
+    expect(evaluations).toMatchObject([
       {
         stepRunId: "step-run-step-1",
-        evaluator: StepRunEvaluator.MIXED
+        evaluator: StepRunEvaluator.MIXED,
+        workflowId: "workflow-1",
+        workflowRunId: "workflow-run-1",
+        workingDirectory: "C:\\repo",
+        artifactStoreRoot: expect.any(String),
+        codexFinalResponse: "Codex finished successfully."
       }
     ]);
     expect(db.requireStepRun("step-run-step-1").status).toBe("ACCEPTED");
@@ -346,6 +487,10 @@ describe("runNextReadyStep", () => {
     expect(db.decisionEvents).toMatchObject([
       {
         source: DecisionSource.EVALUATOR,
+        verdict: DecisionVerdict.APPROVE
+      },
+      {
+        source: DecisionSource.HUMAN,
         verdict: DecisionVerdict.APPROVE
       }
     ]);
@@ -373,7 +518,7 @@ describe("runNextReadyStep", () => {
     expect(executions[0]?.workingDirectory).toBe("C:\\worktrees\\workflow-run-1");
   });
 
-  it("executes agent + EVALUATOR_REVIEW through the stub approval path", async () => {
+  it("executes agent + EVALUATOR_REVIEW through the evaluator approval path", async () => {
     const db = new FakeRuntimeDb([
       {
         id: "step-1",
@@ -390,7 +535,7 @@ describe("runNextReadyStep", () => {
     expect(db.decisionEvents[0]?.source).toBe(DecisionSource.EVALUATOR);
   });
 
-  it("executes code_agent + HUMAN_REVIEW through the stub approval path and advances downstream", async () => {
+  it("executes code_agent + HUMAN_REVIEW through the human approval path and advances downstream", async () => {
     const db = new FakeRuntimeDb([
       {
         id: "step-1",
@@ -433,6 +578,69 @@ describe("runNextReadyStep", () => {
     expect(db.workflowRun.completedAt).toEqual(new Date(Date.UTC(2026, 0, 2)));
   });
 
+  it("rejects mixed evaluator failures, rejects candidate artifacts, and does not ready downstream", async () => {
+    const workingDirectory = await makeTempDirectory("step-worktree-");
+    const artifactStoreRoot = await makeTempDirectory("artifact-store-");
+    const db = new FakeRuntimeDb([
+      {
+        id: "step-1",
+        type: "agent",
+        downstream: "step-2",
+        evaluator: StepRunEvaluator.MIXED,
+        outputArtifacts: [
+          {
+            artifact: "report",
+            filename: "report.md",
+            format: "markdown"
+          }
+        ]
+      },
+      {
+        id: "step-2",
+        type: "agent",
+        upstream: "step-1",
+        evaluator: StepRunEvaluator.EVALUATOR_REVIEW
+      }
+    ]);
+
+    const result = await runNextReadyStep(
+      dependencies(db, {
+        resolveWorkingDirectory: () => workingDirectory,
+        resolveArtifactStoreRoot: () => artifactStoreRoot,
+        evaluateStep: async (input) => ({
+          decisions: [
+            {
+              stepRunId: input.stepRunId,
+              source: DecisionSource.EVALUATOR,
+              verdict: DecisionVerdict.REJECT,
+              comment: "The report does not satisfy the criteria."
+            }
+          ],
+          finalVerdict: DecisionVerdict.REJECT
+        })
+      })
+    );
+
+    expect(result).toMatchObject({ picked: true, outcome: "failed" });
+    expect(db.requireStepRun("step-run-step-1").status).toBe("REJECTED");
+    expect(db.requireStepRun("step-run-step-2").status).toBe("PENDING");
+    expect(db.workflowRun.status).toBe("FAILED");
+    expect(db.decisionEvents).toMatchObject([
+      {
+        source: DecisionSource.EVALUATOR,
+        verdict: DecisionVerdict.REJECT,
+        comment: "The report does not satisfy the criteria."
+      }
+    ]);
+    expect(db.artifactVersions).toMatchObject([
+      {
+        artifactKey: "report",
+        producerStepRunId: "step-run-step-1",
+        status: "REJECTED"
+      }
+    ]);
+  });
+
   it("marks the step and workflow run failed when Codex execution fails", async () => {
     const db = new FakeRuntimeDb([
       {
@@ -447,6 +655,31 @@ describe("runNextReadyStep", () => {
         dependencies(db, {
           executeStepRun: async () => {
             throw new Error("Codex failed before recorder persisted state");
+          }
+        })
+      )
+    ).resolves.toMatchObject({ picked: true, outcome: "failed" });
+    expect(db.requireStepRun("step-run-step-1").status).toBe("FAILED");
+    expect(db.workflowRun.status).toBe("FAILED");
+    expect(db.decisionEvents).toHaveLength(0);
+  });
+
+  it("marks the step and workflow run failed when evaluator execution fails", async () => {
+    const db = new FakeRuntimeDb([
+      {
+        id: "step-1",
+        type: "agent",
+        evaluator: StepRunEvaluator.EVALUATOR_REVIEW
+      }
+    ]);
+
+    await expect(
+      runNextReadyStep(
+        dependencies(db, {
+          evaluateStep: async () => {
+            const error = new Error("Evaluator returned invalid JSON");
+            Object.assign(error, { code: "evaluator_invalid_json" });
+            throw error;
           }
         })
       )
