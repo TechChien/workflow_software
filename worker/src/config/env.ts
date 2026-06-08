@@ -19,6 +19,7 @@ const EnvSchema = z.object({
   CODEX_MODEL: z.string().min(1).optional(),
   CODEX_REASONING_EFFORT: z.enum(["minimal", "low", "medium", "high", "xhigh"]).optional(),
   CODEX_TURN_TIMEOUT_MS: z.coerce.number().int().positive().default(1_800_000),
+  CODE_WORKSPACE_REPO_PATH: z.string().min(1).optional(),
   ARTIFACT_STORE_ROOT: z.string().default("../data/artifacts"),
   CODE_WORKTREE_ROOT: z.string().default("../data/worktrees"),
   EXPORT_ROOT: z.string().default("../data/exports"),

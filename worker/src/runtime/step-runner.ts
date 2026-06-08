@@ -37,6 +37,7 @@ type ReadyStepRun = {
   workflowRunId: string;
   stepId: string;
   evaluator: StepRunEvaluator;
+  codeWorkspaceId: string | null;
   workflowRun: {
     workflowVersion: {
       workflowId: string;
@@ -59,23 +60,30 @@ type StepRunnerClient = {
   workflowRun: {
     updateMany(args: Prisma.WorkflowRunUpdateManyArgs): PromiseLike<{ count: number }>;
   };
+  codeWorkspace: {
+    findFirst(args: Prisma.CodeWorkspaceFindFirstArgs): PromiseLike<{
+      worktreePath: string;
+    } | null>;
+  };
   decisionEvent: {
     create(args: Prisma.DecisionEventCreateArgs): PromiseLike<unknown>;
   };
 } & Partial<ArtifactRuntimeClient>;
 
+export type StepWorkingDirectoryInput = {
+  stepRunId: string;
+  workflowRunId: string;
+  codeWorkspaceId: string | null;
+};
+
 export type StepRunnerDependencies = {
   client?: StepRunnerClient;
   executeStepRun?: (input: ExecuteStepRunWithCodexInput) => Promise<unknown>;
   evaluateStep?: (input: EvaluateStepInput) => Promise<EvaluatorDecision>;
-  resolveWorkingDirectory?: () => string | Promise<string>;
+  resolveWorkingDirectory?: (input: StepWorkingDirectoryInput) => string | Promise<string>;
   resolveArtifactStoreRoot?: () => string | Promise<string>;
   now?: () => Date;
 };
-
-function defaultWorkingDirectory() {
-  return path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
-}
 
 function defaultArtifactStoreRoot() {
   const workerRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -257,6 +265,34 @@ function requireArtifactRuntimeClient(client: StepRunnerClient): ArtifactRuntime
   return client as ArtifactRuntimeClient;
 }
 
+async function resolveCodeWorkspaceWorkingDirectory(
+  client: StepRunnerClient,
+  input: StepWorkingDirectoryInput
+) {
+  const workspace = await client.codeWorkspace.findFirst({
+    where: input.codeWorkspaceId
+      ? {
+          id: input.codeWorkspaceId,
+          workflowRunId: input.workflowRunId
+        }
+      : {
+          workflowRunId: input.workflowRunId
+        },
+    orderBy: {
+      createdAt: "asc"
+    },
+    select: {
+      worktreePath: true
+    }
+  });
+
+  if (!workspace) {
+    throw new Error(`StepRun ${input.stepRunId} does not have a CodeWorkspace`);
+  }
+
+  return workspace.worktreePath;
+}
+
 export async function runNextReadyStep(
   dependencies: StepRunnerDependencies = {}
 ): Promise<StepRunnerResult> {
@@ -265,7 +301,9 @@ export async function runNextReadyStep(
   const executeStepRun = dependencies.executeStepRun ?? executeStepRunWithCodex;
   const evaluateStep = dependencies.evaluateStep ?? evaluateStepArtifact;
   const resolveWorkingDirectory =
-    dependencies.resolveWorkingDirectory ?? defaultWorkingDirectory;
+    dependencies.resolveWorkingDirectory ??
+    ((input: StepWorkingDirectoryInput) =>
+      resolveCodeWorkspaceWorkingDirectory(client, input));
   const resolveArtifactStoreRoot =
     dependencies.resolveArtifactStoreRoot ?? defaultArtifactStoreRoot;
   const now = dependencies.now ?? (() => new Date());
@@ -311,7 +349,11 @@ export async function runNextReadyStep(
     }
 
     await markWorkflowRunRunning(client, stepRun.workflowRunId, now());
-    const workingDirectory = await resolveWorkingDirectory();
+    const workingDirectory = await resolveWorkingDirectory({
+      stepRunId: stepRun.id,
+      workflowRunId: stepRun.workflowRunId,
+      codeWorkspaceId: stepRun.codeWorkspaceId
+    });
     const artifactStoreRoot = await resolveArtifactStoreRoot();
     const artifactClient = stepNeedsArtifactRuntime(step)
       ? requireArtifactRuntimeClient(client)

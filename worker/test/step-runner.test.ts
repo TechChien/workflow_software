@@ -32,9 +32,17 @@ type StepRunRow = {
   stepId: string;
   status: StepRunStatus;
   evaluator: StepRunEvaluator;
+  codeWorkspaceId: string | null;
   codexError: unknown;
   createdAt: Date;
   completedAt: Date | null;
+};
+
+type CodeWorkspaceRow = {
+  id: string;
+  workflowRunId: string;
+  worktreePath: string;
+  createdAt: Date;
 };
 
 type DecisionEventRow = {
@@ -72,6 +80,14 @@ class FakeRuntimeDb {
     completedAt: null
   };
   stepRuns: StepRunRow[] = [];
+  codeWorkspaces: CodeWorkspaceRow[] = [
+    {
+      id: "code-workspace-1",
+      workflowRunId: "workflow-run-1",
+      worktreePath: "C:\\worktrees\\workflow-run-1",
+      createdAt: new Date(Date.UTC(2026, 0, 1))
+    }
+  ];
   decisionEvents: DecisionEventRow[] = [];
 
   constructor(
@@ -118,6 +134,7 @@ class FakeRuntimeDb {
       stepId: step.id,
       status: step.status ?? (step.upstream ? "PENDING" : "READY"),
       evaluator: step.evaluator,
+      codeWorkspaceId: "code-workspace-1",
       codexError: null,
       createdAt: step.createdAt ?? new Date(Date.UTC(2026, 0, 1, 0, 0, index)),
       completedAt: null
@@ -197,6 +214,20 @@ class FakeRuntimeDb {
           matches.forEach((workflowRun) => Object.assign(workflowRun, args.data));
           return { count: matches.length };
         }
+      },
+      codeWorkspace: {
+        findFirst: async (args: {
+          where?: {
+            id?: string;
+            workflowRunId?: string;
+          };
+        }) =>
+          this.codeWorkspaces.find(
+            (workspace) =>
+              (!args.where?.id || workspace.id === args.where.id) &&
+              (!args.where?.workflowRunId ||
+                workspace.workflowRunId === args.where.workflowRunId)
+          ) ?? null
       },
       decisionEvent: {
         create: async (args: { data: DecisionEventRow }) => {
@@ -318,6 +349,28 @@ describe("runNextReadyStep", () => {
         verdict: DecisionVerdict.APPROVE
       }
     ]);
+  });
+
+  it("uses the run CodeWorkspace worktree when no working directory override is provided", async () => {
+    const db = new FakeRuntimeDb([
+      {
+        id: "step-1",
+        type: "agent",
+        evaluator: StepRunEvaluator.MIXED
+      }
+    ]);
+    const executions: ExecuteStepRunWithCodexInput[] = [];
+
+    await expect(
+      runNextReadyStep(
+        dependencies(db, {
+          executeStepRun: createExecutor(db, executions),
+          resolveWorkingDirectory: undefined
+        })
+      )
+    ).resolves.toMatchObject({ picked: true, outcome: "accepted" });
+
+    expect(executions[0]?.workingDirectory).toBe("C:\\worktrees\\workflow-run-1");
   });
 
   it("executes agent + EVALUATOR_REVIEW through the stub approval path", async () => {

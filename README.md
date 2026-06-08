@@ -84,6 +84,20 @@ Run the worker API and poller:
 pnpm dev:worker
 ```
 
+Run the opt-in workspace integration test with a real DB client and Codex executor:
+
+```powershell
+$env:RUN_WORKSPACE_INTEGRATION="true"
+$env:CODE_WORKSPACE_REPO_PATH="C:\path\to\actual\repo"
+pnpm --filter @workflow-software/worker test -- workspace.integration.test.ts
+```
+
+The test rolls back database rows, leaves the created git worktree on disk, and prints a manual cleanup command:
+
+```powershell
+git -C "C:\path\to\actual\repo" worktree remove --force "<printed-worktree-path>"
+```
+
 Build all packages:
 
 ```bash
