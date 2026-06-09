@@ -1,7 +1,11 @@
 import type { NextConfig } from "next";
+import path from "node:path";
 
 const nextConfig: NextConfig = {
-  transpilePackages: ["@workflow-software/shared"]
+  transpilePackages: ["@workflow-software/shared"],
+  turbopack: {
+    root: path.resolve(process.cwd(), "..")
+  }
 };
 
 export default nextConfig;
