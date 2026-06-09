@@ -72,6 +72,28 @@ pnpm --filter @workflow-software/worker prisma:migrate
 
 ## Development
 
+Run a workflow YAML from the CLI:
+
+```bash
+pnpm --filter @workflow-software/worker cli -- docs/examples/workflow.yaml
+```
+
+Pass an optional JSON input payload:
+
+```bash
+pnpm --filter @workflow-software/worker cli -- docs/examples/workflow.yaml --input '{"key":"value"}'
+```
+
+The CLI canonicalizes the YAML, upserts the workflow draft, publishes an immutable workflow version, creates a workflow run, and prints JSON with the workflow, version, revision, and run IDs.
+
+The CLI does not execute queued steps by itself. Start the worker API and poller to pull `READY` step runs and execute them:
+
+```bash
+pnpm dev:worker
+```
+
+Polling is controlled by `WORKER_POLLING_ENABLED` and `WORKER_POLL_INTERVAL_MS` in `worker/.env`.
+
 Run the UI:
 
 ```bash

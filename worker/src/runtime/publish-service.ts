@@ -1,9 +1,48 @@
 import { parseWorkflowYaml } from "@workflow-software/shared";
-import { prisma } from "../db/prisma.js";
+import type { WorkflowVersion } from "../generated/prisma/client.js";
 import { canonicalizeWorkflowDefinition } from "./workflow-definition.js";
 
-export async function publishWorkflowDraft(workflowId: string) {
-  return prisma.$transaction(async (tx) => {
+type PublishWorkflowTransaction = {
+  workflow: {
+    findUniqueOrThrow(args: { where: { id: string } }): PromiseLike<{ draftYaml: string }>;
+  };
+  workflowVersion: {
+    findFirst(args: {
+      where: { workflowId: string };
+      orderBy: { revision: "desc" };
+      select: { revision: true };
+    }): PromiseLike<{ revision: number } | null>;
+    create(args: {
+      data: {
+        workflowId: string;
+        revision: number;
+        yamlSnapshot: string;
+        contentHash: string;
+      };
+    }): PromiseLike<WorkflowVersion>;
+  };
+};
+
+export type PublishWorkflowDraftClient = {
+  $transaction<T>(fn: (tx: PublishWorkflowTransaction) => Promise<T>): Promise<T>;
+};
+
+export type PublishWorkflowDraftDependencies = {
+  client?: PublishWorkflowDraftClient;
+};
+
+async function defaultClient() {
+  const { prisma } = await import("../db/prisma.js");
+  return prisma as unknown as PublishWorkflowDraftClient;
+}
+
+export async function publishWorkflowDraft(
+  workflowId: string,
+  dependencies: PublishWorkflowDraftDependencies = {}
+) {
+  const client = dependencies.client ?? (await defaultClient());
+
+  return client.$transaction(async (tx) => {
     const workflow = await tx.workflow.findUniqueOrThrow({
       where: { id: workflowId }
     });
