@@ -130,7 +130,7 @@ class FakeRuntimeDb {
       outputArtifacts?: Array<{
         artifact: string;
         filename?: string;
-        format?: "markdown" | "plain_text";
+        format: "markdown" | "plain_text";
       }>;
     }>
   ) {

@@ -1,11 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
-  DecisionSource,
-  DecisionVerdict,
   StepRunEvaluator,
   type PrismaClient
 } from "../src/generated/prisma/client.js";
@@ -20,6 +18,7 @@ import {
 } from "../src/codex/prisma-codex-run-recorder.js";
 import { readArtifactVersionContent } from "../src/artifacts/artifact-store.js";
 import { executeStepRunWithCodexCore } from "../src/runtime/codex-step-executor.js";
+import { evaluateStepArtifact } from "../src/runtime/evaluator-runner.js";
 import { runNextReadyStep, type StepRunnerDependencies } from "../src/runtime/step-runner.js";
 import { canonicalizeWorkflowDefinition } from "../src/runtime/workflow-definition.js";
 import { startPoller } from "../src/worker/poller.js";
@@ -46,6 +45,7 @@ const testRoot = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(testRoot, "..", "..");
 const runIntegration = process.env.RUN_CODEX_DB_INTEGRATION === "true";
 const integrationTimeoutMs = Number(process.env.CODEX_DB_INTEGRATION_TIMEOUT_MS ?? 180_000);
+const twoStepWorkflowTimeoutMs = integrationTimeoutMs * 4 + 60_000;
 const describeIntegration = runIntegration ? describe : describe.skip;
 let prismaClient: PrismaClient | undefined;
 
@@ -272,6 +272,140 @@ async function createTwoStepArtifactWorkflowRun(
   };
 }
 
+async function createPlanExecutionWorkflowRun(
+  client: DbClient,
+  input: {
+    planToken: string;
+    executionToken: string;
+  }
+) {
+  const firstStepId = `step-${randomUUID()}`;
+  const secondStepId = `step-${randomUUID()}`;
+  const planArtifactKey = "plan";
+  const executionArtifactKey = "execution_result";
+  const snapshot = canonicalizeWorkflowDefinition({
+    id: `workflow-${randomUUID()}`,
+    name: "Plan execution Codex integration workflow",
+    version: "0.1.0",
+    inputs: {},
+    artifacts: {},
+    steps: [
+      {
+        id: firstStepId,
+        type: "code_agent",
+        downstream: secondStepId,
+        input_artifacts: [],
+        output_artifacts: [
+          {
+            artifact: planArtifactKey,
+            filename: "plan.md",
+            format: "markdown"
+          }
+        ],
+        context_paths: [],
+        tool_capabilities: [],
+        evaluate: { evaluator: "mixed" },
+        prompt: [
+          "Create the declared output artifact plan.md from the workflow runtime contract.",
+          `The plan.md artifact must contain this exact marker once: ${input.planToken}`,
+          "Include a short numbered plan with exactly two execution tasks.",
+          "Do not create any extra artifact files.",
+          "Reply exactly PLAN_ARTIFACT_DONE."
+        ].join("\n"),
+        acceptance: {
+          criteria: [
+            "The declared plan artifact is written to plan.md.",
+            `plan.md contains the marker ${input.planToken}.`,
+            "plan.md contains a numbered two-task execution plan."
+          ]
+        }
+      },
+      {
+        id: secondStepId,
+        type: "code_agent",
+        upstream: firstStepId,
+        input_artifacts: [
+          {
+            artifact: planArtifactKey,
+            required: true
+          }
+        ],
+        output_artifacts: [
+          {
+            artifact: executionArtifactKey,
+            filename: "execution-result.md",
+            format: "markdown"
+          }
+        ],
+        context_paths: [],
+        tool_capabilities: [],
+        evaluate: { evaluator: "mixed" },
+        prompt: [
+          "Read the required input artifact from the workflow runtime contract. It is the plan.md produced by Step1.",
+          "Execute that plan by writing the declared output artifact execution-result.md.",
+          `The execution-result.md artifact must include the plan marker: ${input.planToken}`,
+          `The execution-result.md artifact must include this execution marker: ${input.executionToken}`,
+          "Do not modify the input artifact.",
+          "Reply exactly PLAN_EXECUTION_DONE."
+        ].join("\n"),
+        acceptance: {
+          criteria: [
+            "The required plan input artifact is read before producing the result.",
+            `execution-result.md contains the plan marker ${input.planToken}.`,
+            `execution-result.md contains the execution marker ${input.executionToken}.`
+          ]
+        }
+      }
+    ],
+    ui: {}
+  });
+
+  const workflow = await client.workflow.create({
+    data: {
+      name: snapshot.definition.name,
+      draftYaml: snapshot.yaml
+    }
+  });
+  const version = await client.workflowVersion.create({
+    data: {
+      workflowId: workflow.id,
+      revision: 1,
+      yamlSnapshot: snapshot.yaml,
+      contentHash: snapshot.contentHash
+    }
+  });
+  const workflowRun = await client.workflowRun.create({
+    data: {
+      workflowVersionId: version.id
+    }
+  });
+  const firstStepRun = await client.stepRun.create({
+    data: {
+      workflowRunId: workflowRun.id,
+      stepId: firstStepId,
+      status: "READY",
+      evaluator: StepRunEvaluator.MIXED
+    }
+  });
+  const secondStepRun = await client.stepRun.create({
+    data: {
+      workflowRunId: workflowRun.id,
+      stepId: secondStepId,
+      status: "PENDING",
+      evaluator: StepRunEvaluator.MIXED,
+      upstreamStepRunId: firstStepRun.id
+    }
+  });
+
+  return {
+    workflowId: workflow.id,
+    workflowRunId: workflowRun.id,
+    stepRunIds: [firstStepRun.id, secondStepRun.id],
+    planArtifactKey,
+    executionArtifactKey
+  };
+}
+
 async function stepStatuses(client: DbClient, workflowRunId: string) {
   const steps = await client.stepRun.findMany({
     where: { workflowRunId },
@@ -312,11 +446,16 @@ async function pollWorkflowRun(client: DbClient, workflowRunId: string, artifact
         recorder: new PrismaCodexRunRecorder(client),
         settings: codexSettings()
       }),
-    evaluateStep: async (input) => ({
-      stepRunId: input.stepRunId,
-      source: DecisionSource.EVALUATOR,
-      verdict: DecisionVerdict.APPROVE
-    }),
+    evaluateStep: (input) =>
+      evaluateStepArtifact(input, {
+        gateway: createOpenAICodexGateway(
+          buildCodexClientOptions({
+            apiKey: process.env.CODEX_API_KEY,
+            baseUrl: process.env.CODEX_BASE_URL
+          })
+        ),
+        settings: codexSettings()
+      }),
     resolveWorkingDirectory: () => repoRoot,
     ...(artifactStoreRoot ? { resolveArtifactStoreRoot: () => artifactStoreRoot } : {})
   });
@@ -335,7 +474,7 @@ function delay(ms: number) {
 }
 
 async function waitForCompletedWorkflow(client: DbClient, workflowRunId: string) {
-  const deadline = Date.now() + integrationTimeoutMs;
+  const deadline = Date.now() + twoStepWorkflowTimeoutMs;
 
   while (Date.now() < deadline) {
     if ((await workflowStatus(client, workflowRunId)) === "COMPLETED") {
@@ -410,7 +549,7 @@ describeIntegration("startPoller Codex integration", () => {
           },
           {
             maxWait: 10_000,
-            timeout: integrationTimeoutMs + 10_000
+            timeout: twoStepWorkflowTimeoutMs
           }
         );
       } catch (error) {
@@ -431,7 +570,7 @@ describeIntegration("startPoller Codex integration", () => {
         })
       ).resolves.toEqual([]);
     },
-    integrationTimeoutMs + 20_000
+    twoStepWorkflowTimeoutMs + 10_000
   );
 
   it(
@@ -505,7 +644,7 @@ describeIntegration("startPoller Codex integration", () => {
           },
           {
             maxWait: 10_000,
-            timeout: integrationTimeoutMs + 20_000
+            timeout: twoStepWorkflowTimeoutMs
           }
         );
       } catch (error) {
@@ -542,6 +681,207 @@ describeIntegration("startPoller Codex integration", () => {
         })
       ).resolves.toBeNull();
     },
-    integrationTimeoutMs + 40_000
+    twoStepWorkflowTimeoutMs + 10_000
+  );
+
+  it(
+    "creates plan.md, consumes it in a downstream Codex step, rolls back DB rows, and leaves the artifact file",
+    async () => {
+      const prisma = await loadPrisma();
+      const artifactStoreRoot = path.join(
+        repoRoot,
+        ".codex-integration-artifacts",
+        randomUUID()
+      );
+      const planToken = `PLAN_INPUT_${randomUUID()}`;
+      const executionToken = `PLAN_EXECUTED_${randomUUID()}`;
+      let workflowId: string | undefined;
+      let workflowRunId: string | undefined;
+      let stepRunIds: string[] = [];
+      let runtimePlanPath: string | undefined;
+      let materializedInputPlanPath: string | undefined;
+      let storedPlanPath: string | undefined;
+      let storedExecutionPath: string | undefined;
+
+      try {
+        await prisma.$transaction(
+          async (tx) => {
+            const client = tx as unknown as DbClient;
+            const created = await createPlanExecutionWorkflowRun(client, {
+              planToken,
+              executionToken
+            });
+            workflowId = created.workflowId;
+            workflowRunId = created.workflowRunId;
+            stepRunIds = created.stepRunIds;
+            runtimePlanPath = path.join(
+              repoRoot,
+              ".workflow-runtime",
+              "artifacts",
+              created.stepRunIds[0] as string,
+              "outputs",
+              "plan.md"
+            );
+            materializedInputPlanPath = path.join(
+              repoRoot,
+              ".workflow-runtime",
+              "artifacts",
+              created.stepRunIds[1] as string,
+              "inputs",
+              "plan",
+              "plan.md"
+            );
+
+            await expect(
+              pollWorkflowRun(client, created.workflowRunId, artifactStoreRoot)
+            ).resolves.toMatchObject({ picked: true, outcome: "accepted" });
+            await expect(
+              pollWorkflowRun(client, created.workflowRunId, artifactStoreRoot)
+            ).resolves.toMatchObject({ picked: true, outcome: "accepted" });
+
+            expect(await workflowStatus(client, created.workflowRunId)).toBe("COMPLETED");
+            expect(await stepStatuses(client, created.workflowRunId)).toContain(
+              `${created.stepRunIds[0]}:ACCEPTED`
+            );
+            expect(await stepStatuses(client, created.workflowRunId)).toContain(
+              `${created.stepRunIds[1]}:ACCEPTED`
+            );
+
+            await expect(readFile(runtimePlanPath, "utf8")).resolves.toContain(planToken);
+            await expect(readFile(materializedInputPlanPath, "utf8")).resolves.toContain(
+              planToken
+            );
+
+            const planInput = await client.stepRunArtifactInput.findFirst({
+              where: {
+                stepRunId: created.stepRunIds[1],
+                artifactKey: created.planArtifactKey
+              }
+            });
+            expect(planInput).not.toBeNull();
+
+            const planArtifact = await client.artifactVersion.findFirst({
+              where: {
+                workflowRunId: created.workflowRunId,
+                artifactKey: created.planArtifactKey,
+                status: "ACCEPTED"
+              },
+              orderBy: {
+                version: "desc"
+              }
+            });
+            expect(planArtifact).not.toBeNull();
+            expect(planInput?.artifactVersionId).toBe(planArtifact?.id);
+
+            const storedPlan = await readArtifactVersionContent({
+              root: artifactStoreRoot,
+              workflowId: created.workflowId,
+              runId: created.workflowRunId,
+              artifactKey: created.planArtifactKey,
+              version: planArtifact?.version ?? 0
+            });
+            storedPlanPath = storedPlan.contentPath;
+            expect(storedPlan.content).toContain(planToken);
+
+            const executionArtifact = await client.artifactVersion.findFirst({
+              where: {
+                workflowRunId: created.workflowRunId,
+                artifactKey: created.executionArtifactKey,
+                status: "ACCEPTED"
+              },
+              orderBy: {
+                version: "desc"
+              }
+            });
+            expect(executionArtifact).not.toBeNull();
+
+            const storedExecution = await readArtifactVersionContent({
+              root: artifactStoreRoot,
+              workflowId: created.workflowId,
+              runId: created.workflowRunId,
+              artifactKey: created.executionArtifactKey,
+              version: executionArtifact?.version ?? 0
+            });
+            storedExecutionPath = storedExecution.contentPath;
+            expect(storedExecution.content).toContain(planToken);
+            expect(storedExecution.content).toContain(executionToken);
+
+            const finishedSteps = await client.stepRun.findMany({
+              where: {
+                id: {
+                  in: created.stepRunIds
+                }
+              },
+              orderBy: {
+                createdAt: "asc"
+              },
+              select: {
+                codexFinalResponse: true
+              }
+            });
+            expect(finishedSteps[0]?.codexFinalResponse).toContain("PLAN_ARTIFACT_DONE");
+            expect(finishedSteps[1]?.codexFinalResponse).toContain("PLAN_EXECUTION_DONE");
+
+            throw new RollbackIntegrationTransaction();
+          },
+          {
+            maxWait: 10_000,
+            timeout: twoStepWorkflowTimeoutMs
+          }
+        );
+      } catch (error) {
+        if (!(error instanceof RollbackIntegrationTransaction)) {
+          throw error;
+        }
+      } finally {
+        if (runtimePlanPath) {
+          console.log(`[poller integration] plan.md left on disk: ${runtimePlanPath}`);
+        }
+        if (materializedInputPlanPath) {
+          console.log(
+            `[poller integration] downstream input plan.md left on disk: ${materializedInputPlanPath}`
+          );
+        }
+        if (storedPlanPath) {
+          console.log(`[poller integration] stored plan artifact left on disk: ${storedPlanPath}`);
+        }
+        if (storedExecutionPath) {
+          console.log(
+            `[poller integration] stored execution artifact left on disk: ${storedExecutionPath}`
+          );
+        }
+      }
+
+      expect(workflowId).toEqual(expect.any(String));
+      expect(workflowRunId).toEqual(expect.any(String));
+      expect(stepRunIds).toHaveLength(2);
+      expect(runtimePlanPath).toEqual(expect.any(String));
+      expect(materializedInputPlanPath).toEqual(expect.any(String));
+      expect(storedPlanPath).toEqual(expect.any(String));
+      expect(storedExecutionPath).toEqual(expect.any(String));
+      await expect(
+        prisma.workflowRun.findUnique({
+          where: { id: workflowRunId }
+        })
+      ).resolves.toBeNull();
+      await expect(
+        prisma.artifactVersion.findMany({
+          where: { workflowRunId }
+        })
+      ).resolves.toEqual([]);
+      await expect(
+        prisma.stepRun.findMany({
+          where: { id: { in: stepRunIds } }
+        })
+      ).resolves.toEqual([]);
+      await expect(
+        prisma.workflow.findUnique({
+          where: { id: workflowId }
+        })
+      ).resolves.toBeNull();
+      await expect(readFile(runtimePlanPath as string, "utf8")).resolves.toContain(planToken);
+      await expect(readFile(storedPlanPath as string, "utf8")).resolves.toContain(planToken);
+    },
+    twoStepWorkflowTimeoutMs + 10_000
   );
 });
