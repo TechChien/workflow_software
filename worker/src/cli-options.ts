@@ -1,5 +1,5 @@
 export const cliUsage =
-  "Usage: pnpm --filter @workflow-software/worker cli -- <workflow.yaml> [--input '{\"key\":\"value\"}']";
+  "Usage: pnpm --filter @workflow-software/worker cli -- <workflow.yaml> [--repo-path <path>] [--input '{\"key\":\"value\"}']";
 
 export type CliOptions =
   | {
@@ -9,6 +9,7 @@ export type CliOptions =
       help: false;
       workflowPath: string;
       inputPayload: Record<string, unknown>;
+      repoPath?: string;
     };
 
 function parseInputPayload(source: string) {
@@ -30,6 +31,7 @@ function parseInputPayload(source: string) {
 export function parseCliArgs(args: string[]): CliOptions {
   let workflowPath: string | undefined;
   let inputPayload: Record<string, unknown> = {};
+  let repoPath: string | undefined;
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -46,6 +48,18 @@ export function parseCliArgs(args: string[]): CliOptions {
       }
 
       inputPayload = parseInputPayload(source);
+      index += 1;
+      continue;
+    }
+
+    if (arg === "--repo-path") {
+      const source = args[index + 1];
+
+      if (!source) {
+        throw new Error("--repo-path requires a path argument");
+      }
+
+      repoPath = source;
       index += 1;
       continue;
     }
@@ -68,6 +82,7 @@ export function parseCliArgs(args: string[]): CliOptions {
   return {
     help: false,
     workflowPath,
-    inputPayload
+    inputPayload,
+    ...(repoPath ? { repoPath } : {})
   };
 }

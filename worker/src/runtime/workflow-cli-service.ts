@@ -50,6 +50,7 @@ export type RunWorkflowFileDependencies = {
 export type RunWorkflowFileInput = {
   workflowPath: string;
   inputPayload: Record<string, unknown>;
+  repoPath?: string;
 };
 
 export type RunWorkflowFileResult = {
@@ -106,7 +107,14 @@ export async function runWorkflowFile(
   const version = (await publishWorkflowDraft(workflow.id, {
     client
   })) as WorkflowVersion;
-  const run = await createRun(version.id, input.inputPayload, { client });
+  const repoPath = input.repoPath
+    ? path.resolve(input.repoPath)
+    : undefined;
+  const runDependencies: CreateWorkflowRunDependencies = {
+    client,
+    ...(repoPath ? { resolveRepoPath: () => repoPath } : {})
+  };
+  const run = await createRun(version.id, input.inputPayload, runDependencies);
 
   return {
     workflowId: workflow.id,

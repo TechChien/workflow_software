@@ -1,3 +1,4 @@
+import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
   runWorkflowFile,
@@ -236,5 +237,29 @@ describe("runWorkflowFile", () => {
     expect(createRun).toHaveBeenCalledWith("workflow-version-1", inputPayload, {
       client: fake.client
     });
+  });
+
+  it("passes the repo path to run creation", async () => {
+    const fake = createFakeClient();
+    const repoPath = "C:\\repo\\feature-worktree";
+    const createRun = vi.fn(async () => ({ id: "workflow-run-1" }));
+
+    await runWorkflowFile(
+      {
+        workflowPath: "workflow.yaml",
+        inputPayload: {},
+        repoPath
+      },
+      {
+        client: fake.client,
+        readWorkflowFile: async () => workflowYaml({ name: "CLI Workflow" }),
+        createRun
+      }
+    );
+
+    const dependencies = createRun.mock.calls[0]?.[2];
+
+    expect(dependencies?.client).toBe(fake.client);
+    expect(dependencies?.resolveRepoPath?.()).toBe(path.resolve(repoPath));
   });
 });

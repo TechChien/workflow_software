@@ -185,9 +185,14 @@ async function runWorkspaceStep(client: DbClient) {
         settings: codexSettings()
       }),
     evaluateStep: async (input) => ({
-      stepRunId: input.stepRunId,
-      source: DecisionSource.EVALUATOR,
-      verdict: DecisionVerdict.APPROVE
+      decisions: [
+        {
+          stepRunId: input.stepRunId,
+          source: DecisionSource.EVALUATOR,
+          verdict: DecisionVerdict.APPROVE
+        }
+      ],
+      finalVerdict: DecisionVerdict.APPROVE
     })
   });
 }

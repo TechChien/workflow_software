@@ -18,6 +18,12 @@ describe("parseCliArgs", () => {
     );
   });
 
+  it("fails when repo path is missing", () => {
+    expect(() => parseCliArgs(["workflow.yaml", "--repo-path"])).toThrow(
+      "--repo-path requires a path argument"
+    );
+  });
+
   it("defaults input payload to an empty object", () => {
     expect(parseCliArgs(["workflow.yaml"])).toEqual({
       help: false,
@@ -33,6 +39,15 @@ describe("parseCliArgs", () => {
       inputPayload: {
         issue: "123"
       }
+    });
+  });
+
+  it("parses repo path", () => {
+    expect(parseCliArgs(["workflow.yaml", "--repo-path", "C:\\repo"])).toEqual({
+      help: false,
+      workflowPath: "workflow.yaml",
+      inputPayload: {},
+      repoPath: "C:\\repo"
     });
   });
 });

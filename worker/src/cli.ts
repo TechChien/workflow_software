@@ -9,7 +9,8 @@ try {
   } else {
     const result = await runWorkflowFile({
       workflowPath: options.workflowPath,
-      inputPayload: options.inputPayload
+      inputPayload: options.inputPayload,
+      repoPath: options.repoPath
     });
 
     console.log(JSON.stringify(result));
