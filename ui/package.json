@@ -4,13 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "pnpm --filter @workflow-software/shared build && next dev",
+    "dev": "pnpm --filter @workflow-software/shared build && next dev --webpack",
     "build": "next build",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@workflow-software/shared": "workspace:*",
     "@xyflow/react": "latest",
+    "lucide-react": "^1.17.0",
     "next": "latest",
     "react": "latest",
     "react-dom": "latest"
