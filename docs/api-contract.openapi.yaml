@@ -1,0 +1,1453 @@
+openapi: 3.1.0
+info:
+  title: Workflow Software Backend API Contract
+  version: 0.1.0
+  summary: Contract-driven backend API for the workflow builder UI and worker runtime.
+  description: |
+    This contract is the backend implementation target for the UI. It is based on
+    worker/prisma/schema.prisma, the existing worker routes, shared Zod schemas,
+    and the current workflow builder screens.
+
+    API responses must use lower_snake_case enum values. Prisma stores generated
+    enum values in upper-case form, so backend route serializers should normalize
+    values before returning them to the UI.
+
+servers:
+  - url: http://localhost:4000
+    description: Local worker API default
+
+tags:
+  - name: Health
+  - name: Workflows
+  - name: Workflow Versions
+  - name: Runs
+  - name: Step Runs
+  - name: Human Decisions
+  - name: Codex Interactions
+  - name: Artifacts
+
+x-prisma-source-of-data:
+  Workflow:
+    table: Workflow
+    fields: [id, name, draftYaml, createdAt, updatedAt]
+    note: draftYaml is stored as text and returned by the API as parsed WorkflowYaml.
+  WorkflowVersion:
+    table: WorkflowVersion
+    fields: [id, workflowId, revision, yamlSnapshot, contentHash, publishedAt]
+    note: yamlSnapshot is stored as text and returned by the API as parsed WorkflowYaml.
+  WorkflowRun:
+    table: WorkflowRun
+    fields: [id, workflowVersionId, status, triggerType, inputPayload, createdAt, startedAt, completedAt]
+  StepRun:
+    table: StepRun
+    fields:
+      - id
+      - workflowRunId
+      - stepId
+      - attempt
+      - status
+      - evaluator
+      - upstreamStepRunId
+      - downstreamStepRunId
+      - codexThreadId
+      - promptSnapshot
+      - codexOptions
+      - codexFinalResponse
+      - codexUsage
+      - codexError
+      - codexCompletedAt
+      - codeWorkspaceId
+      - beforeCommit
+      - afterCommit
+      - requiresCodeReview
+      - staleReason
+      - createdAt
+      - startedAt
+      - completedAt
+  ArtifactVersion:
+    table: ArtifactVersion
+    fields:
+      - id
+      - workflowRunId
+      - artifactKey
+      - version
+      - producerStepRunId
+      - parentVersionId
+      - status
+      - contentUri
+      - contentHash
+      - createdAt
+      - acceptedAt
+  StepRunArtifactInput:
+    table: StepRunArtifactInput
+    fields: [id, stepRunId, artifactKey, artifactVersionId]
+  DecisionEvent:
+    table: DecisionEvent
+    fields: [id, workflowRunId, stepRunId, source, verdict, comment, targetStepId, createdAt]
+  CodexInteractionEvent:
+    table: CodexInteractionEvent
+    fields: [id, stepRunId, sequence, externalItemId, kind, status, payload, createdAt]
+  ContextPathEvent:
+    table: ContextPathEvent
+    fields: [id, stepRunId, path, type, status, reason, createdAt]
+  ToolInvocation:
+    table: ToolInvocation
+    fields: [id, stepRunId, toolName, status, argumentsRedacted, resultRef, createdAt]
+  RunEvent:
+    table: RunEvent
+    fields: [id, workflowRunId, eventType, payload, createdAt]
+  CodeWorkspace:
+    table: CodeWorkspace
+    fields: [id, workflowRunId, repoPath, baseRef, worktreePath, baseCommit, createdAt]
+  CodeChangeRecord:
+    table: CodeChangeRecord
+    fields: [id, stepRunId, codeWorkspaceId, beforeCommit, afterCommit, diffUri, diffHash, status, createdAt]
+
+x-missing-or-derived-schema-fields:
+  - field: ArtifactVersion.filename
+    status: derived_or_missing
+    notice: |
+      ArtifactVersion does not store the declared filename. The backend can derive it
+      by parsing WorkflowVersion.yamlSnapshot and matching producer StepRun.stepId plus
+      ArtifactVersion.artifactKey against steps[].output_artifacts[]. Add a DB column
+      if artifact metadata must be queried without parsing the immutable snapshot.
+  - field: ArtifactVersion.format
+    status: derived_or_missing
+    notice: |
+      ArtifactVersion does not store markdown/plain_text format. The backend can derive
+      it from WorkflowVersion.yamlSnapshot. Add a DB column if format must be indexed
+      or returned without snapshot parsing.
+  - field: CodexInteractionEvent.response
+    status: missing_for_resumable_pause
+    notice: |
+      The schema can record Codex interaction events, but it has no dedicated field/table
+      for a user answer to a permission request or Codex question. If resumable Codex
+      pauses are implemented, add response lifecycle fields or a separate response table.
+  - field: Workflow.latestPublishedVersion
+    status: derived
+    notice: |
+      Workflow cards need latest published version and last run status. These are not
+      Workflow columns, but can be derived from WorkflowVersion and WorkflowRun joins.
+  - field: API enum casing
+    status: serializer_requirement
+    notice: |
+      Prisma enum values are upper-case. This API contract uses lower_snake_case values
+      matching shared constants and UI types.
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      operationId: getHealth
+      summary: Check worker API health.
+      x-implementation-status: implemented
+      responses:
+        "200":
+          description: Worker API is reachable.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok:
+                    type: boolean
+                    const: true
+
+  /api/workflows:
+    get:
+      tags: [Workflows]
+      operationId: listWorkflows
+      summary: List workflow drafts for the builder sidebar.
+      x-implementation-status: implemented_response_should_expand
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: Workflow draft list.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowListResponse"
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      tags: [Workflows]
+      operationId: createWorkflow
+      summary: Create a workflow draft from canonical YAML.
+      x-implementation-status: implemented
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWorkflowRequest"
+      responses:
+        "201":
+          description: Created workflow draft.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowDraft"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /api/workflows/{workflowId}:
+    get:
+      tags: [Workflows]
+      operationId: getWorkflow
+      summary: Get one workflow draft with publish and run summary data.
+      x-implementation-status: required_missing
+      parameters:
+        - $ref: "#/components/parameters/WorkflowId"
+      responses:
+        "200":
+          description: Workflow detail.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /api/workflows/{workflowId}/draft:
+    patch:
+      tags: [Workflows]
+      operationId: updateWorkflowDraft
+      summary: Replace the editable workflow draft YAML.
+      x-implementation-status: implemented
+      parameters:
+        - $ref: "#/components/parameters/WorkflowId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateDraftWorkflowRequest"
+      responses:
+        "200":
+          description: Updated workflow draft.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowDraft"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /api/workflows/{workflowId}/versions:
+    get:
+      tags: [Workflow Versions]
+      operationId: listWorkflowVersions
+      summary: List published immutable versions for one workflow.
+      x-implementation-status: required_missing
+      parameters:
+        - $ref: "#/components/parameters/WorkflowId"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: Published version list.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowVersionListResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /api/workflow-versions/{workflowId}/publish:
+    post:
+      tags: [Workflow Versions]
+      operationId: publishWorkflowDraft
+      summary: Publish the current draft as an immutable workflow version.
+      description: |
+        This URL matches the currently registered worker route. A future REST cleanup
+        may alias this operation to POST /api/workflows/{workflowId}/versions.
+      x-implementation-status: implemented
+      parameters:
+        - $ref: "#/components/parameters/WorkflowId"
+      responses:
+        "201":
+          description: Published workflow version.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowVersion"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /api/workflow-versions/{workflowVersionId}:
+    get:
+      tags: [Workflow Versions]
+      operationId: getWorkflowVersion
+      summary: Get one published workflow snapshot.
+      x-implementation-status: required_missing
+      parameters:
+        - $ref: "#/components/parameters/WorkflowVersionId"
+      responses:
+        "200":
+          description: Published workflow version.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowVersion"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /api/runs:
+    get:
+      tags: [Runs]
+      operationId: listWorkflowRuns
+      summary: List workflow runs for the history panel.
+      x-implementation-status: required_missing
+      parameters:
+        - name: workflowId
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filter by logical workflow id.
+        - name: workflowVersionId
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filter by published workflow version id.
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/WorkflowRunStatus"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: Workflow run history.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowRunListResponse"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /api/runs/workflow-versions/{workflowVersionId}:
+    post:
+      tags: [Runs]
+      operationId: createWorkflowRun
+      summary: Create a run for a published workflow version.
+      x-implementation-status: implemented
+      parameters:
+        - $ref: "#/components/parameters/WorkflowVersionId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRunRequest"
+      responses:
+        "201":
+          description: Created workflow run with initialized step runs and code workspace.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowRunDetail"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /api/runs/{runId}:
+    get:
+      tags: [Runs]
+      operationId: getWorkflowRun
+      summary: Get run detail for status, timeline, inspectors, decisions, and artifacts.
+      x-implementation-status: implemented_response_should_expand
+      parameters:
+        - $ref: "#/components/parameters/RunId"
+      responses:
+        "200":
+          description: Workflow run detail.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowRunDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /api/runs/{runId}/events:
+    get:
+      tags: [Runs]
+      operationId: listRunEvents
+      summary: Poll lightweight run events for live UI updates.
+      x-implementation-status: required_missing
+      parameters:
+        - $ref: "#/components/parameters/RunId"
+        - name: after
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Return events after this event id or cursor.
+      responses:
+        "200":
+          description: Ordered run events.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/RunEvent"
+                  nextCursor:
+                    type: string
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /api/step-runs/{stepRunId}/rerun:
+    post:
+      tags: [Step Runs]
+      operationId: rerunStep
+      summary: Request a rerun of one step after rejection, revision, or stale state.
+      x-implementation-status: required_missing
+      parameters:
+        - $ref: "#/components/parameters/StepRunId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RerunStepRequest"
+      responses:
+        "202":
+          description: Rerun was queued and affected downstream state is returned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RerunStepResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /api/human-decisions/{stepRunId}:
+    post:
+      tags: [Human Decisions]
+      operationId: createHumanDecision
+      summary: Persist a human review decision for a waiting step.
+      x-implementation-status: implemented_stub_should_persist
+      parameters:
+        - $ref: "#/components/parameters/StepRunId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HumanDecisionRequest"
+      responses:
+        "201":
+          description: Created decision event and updated step/run state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HumanDecisionResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /api/codex-interactions/{interactionEventId}/response:
+    post:
+      tags: [Codex Interactions]
+      operationId: respondToCodexInteraction
+      summary: Answer a Codex permission request or user question.
+      description: |
+        Required only if the runtime is upgraded to a Codex execution path that can
+        pause and resume the same turn. The current TypeScript SDK path records
+        events but does not expose resumable permission/question handling.
+      x-implementation-status: blocked_by_schema_and_runtime
+      parameters:
+        - $ref: "#/components/parameters/InteractionEventId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CodexInteractionResponseRequest"
+      responses:
+        "202":
+          description: Response accepted for the paused Codex turn.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CodexInteractionResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /api/artifacts/{artifactVersionId}:
+    get:
+      tags: [Artifacts]
+      operationId: getArtifactVersion
+      summary: Get artifact metadata and optional text content.
+      x-implementation-status: implemented_stub_should_expand
+      parameters:
+        - $ref: "#/components/parameters/ArtifactVersionId"
+        - name: includeContent
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: true
+          description: Include artifact content when it is text and small enough for JSON.
+      responses:
+        "200":
+          description: Artifact metadata and content.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtifactVersionContent"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/Error"
+
+components:
+  parameters:
+    WorkflowId:
+      name: workflowId
+      in: path
+      required: true
+      schema:
+        type: string
+    WorkflowVersionId:
+      name: workflowVersionId
+      in: path
+      required: true
+      schema:
+        type: string
+    RunId:
+      name: runId
+      in: path
+      required: true
+      schema:
+        type: string
+    StepRunId:
+      name: stepRunId
+      in: path
+      required: true
+      schema:
+        type: string
+    ArtifactVersionId:
+      name: artifactVersionId
+      in: path
+      required: true
+      schema:
+        type: string
+    InteractionEventId:
+      name: interactionEventId
+      in: path
+      required: true
+      schema:
+        type: string
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      schema:
+        type: string
+
+  responses:
+    Error:
+      description: Unexpected API error.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    ValidationError:
+      description: Request validation failed.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Requested resource was not found.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              examples: [validation_error, not_found, internal_error]
+            message:
+              type: string
+            details:
+              type: object
+              additionalProperties: true
+
+    WorkflowRunStatus:
+      type: string
+      enum: [pending, running, waiting, completed, failed, cancelled]
+
+    StepRunStatus:
+      type: string
+      enum:
+        - pending
+        - ready
+        - running
+        - codex_completed
+        - waiting_for_codex_permission
+        - waiting_for_codex_question
+        - waiting_for_human_review
+        - waiting_for_evaluator_feedback
+        - accepted
+        - rejected
+        - failed
+        - stale
+
+    StepRunEvaluator:
+      type: string
+      enum: [mixed, human_review, evaluator_review]
+
+    ArtifactStatus:
+      type: string
+      enum: [candidate, accepted, rejected, superseded, stale]
+
+    DecisionSource:
+      type: string
+      enum: [evaluator, human]
+
+    DecisionVerdict:
+      type: string
+      enum: [approve, reject, request_revision]
+
+    JsonObject:
+      type: object
+      additionalProperties: true
+
+    WorkflowYaml:
+      type: object
+      required: [id, name, version, inputs, artifacts, steps, ui]
+      properties:
+        id:
+          type: string
+          minLength: 1
+        name:
+          type: string
+          minLength: 1
+        version:
+          type: string
+          default: 0.1.0
+        description:
+          type: string
+        inputs:
+          type: object
+          additionalProperties: true
+          default: {}
+        artifacts:
+          type: object
+          additionalProperties: true
+          default: {}
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/StepDefinition"
+        ui:
+          type: object
+          additionalProperties: true
+          default: {}
+
+    StepDefinition:
+      type: object
+      required:
+        - id
+        - type
+        - input_artifacts
+        - output_artifacts
+        - context_paths
+        - tool_capabilities
+        - evaluate
+        - prompt
+        - acceptance
+      properties:
+        id:
+          type: string
+          minLength: 1
+        name:
+          type: string
+        type:
+          type: string
+          enum: [agent, code_agent]
+        upstream:
+          type: string
+        downstream:
+          type: string
+        input_artifacts:
+          type: array
+          items:
+            $ref: "#/components/schemas/StepArtifactInput"
+          default: []
+        output_artifacts:
+          type: array
+          items:
+            $ref: "#/components/schemas/ArtifactDefinition"
+          default: []
+        context_paths:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContextPath"
+          default: []
+        tool_capabilities:
+          type: array
+          items:
+            type: string
+            minLength: 1
+          default: []
+        evaluate:
+          type: object
+          required: [evaluator]
+          properties:
+            evaluator:
+              $ref: "#/components/schemas/StepRunEvaluator"
+        prompt:
+          type: string
+          default: ""
+        acceptance:
+          type: object
+          required: [criteria]
+          properties:
+            criteria:
+              type: array
+              items:
+                type: string
+                minLength: 1
+              default: []
+
+    StepArtifactInput:
+      type: object
+      required: [artifact, required]
+      properties:
+        artifact:
+          type: string
+          minLength: 1
+        required:
+          type: boolean
+          default: true
+
+    ArtifactDefinition:
+      type: object
+      required: [artifact, format]
+      properties:
+        artifact:
+          type: string
+          minLength: 1
+        filename:
+          type: string
+          minLength: 1
+        format:
+          type: string
+          enum: [markdown, plain_text]
+          default: markdown
+
+    ContextPath:
+      type: object
+      required: [path, type, optional]
+      properties:
+        path:
+          type: string
+          minLength: 1
+        type:
+          type: string
+          enum: [file, directory]
+        optional:
+          type: boolean
+          default: true
+
+    CreateWorkflowRequest:
+      type: object
+      required: [draftYaml]
+      properties:
+        draftYaml:
+          $ref: "#/components/schemas/WorkflowYaml"
+
+    UpdateDraftWorkflowRequest:
+      type: object
+      required: [draftYaml]
+      properties:
+        draftYaml:
+          $ref: "#/components/schemas/WorkflowYaml"
+
+    WorkflowDraft:
+      type: object
+      required: [id, name, draftYaml, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        draftYaml:
+          $ref: "#/components/schemas/WorkflowYaml"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    WorkflowSummary:
+      allOf:
+        - $ref: "#/components/schemas/WorkflowDraft"
+        - type: object
+          properties:
+            latestPublishedVersion:
+              $ref: "#/components/schemas/WorkflowVersionSummary"
+            lastRun:
+              $ref: "#/components/schemas/WorkflowRunSummary"
+
+    WorkflowDetail:
+      allOf:
+        - $ref: "#/components/schemas/WorkflowDraft"
+        - type: object
+          required: [versions, recentRuns]
+          properties:
+            versions:
+              type: array
+              items:
+                $ref: "#/components/schemas/WorkflowVersionSummary"
+            recentRuns:
+              type: array
+              items:
+                $ref: "#/components/schemas/WorkflowRunSummary"
+
+    WorkflowListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkflowSummary"
+        nextCursor:
+          type: string
+
+    WorkflowVersion:
+      type: object
+      required: [id, workflowId, revision, yamlSnapshot, contentHash, publishedAt]
+      properties:
+        id:
+          type: string
+        workflowId:
+          type: string
+        revision:
+          type: integer
+          minimum: 1
+        yamlSnapshot:
+          $ref: "#/components/schemas/WorkflowYaml"
+        contentHash:
+          type: string
+        publishedAt:
+          type: string
+          format: date-time
+        lastRun:
+          $ref: "#/components/schemas/WorkflowRunSummary"
+
+    WorkflowVersionSummary:
+      type: object
+      required: [id, workflowId, revision, workflowName, publishedAt, contentHash]
+      properties:
+        id:
+          type: string
+        workflowId:
+          type: string
+        revision:
+          type: integer
+          minimum: 1
+        workflowName:
+          type: string
+          description: Parsed from yamlSnapshot.name.
+        publishedAt:
+          type: string
+          format: date-time
+        contentHash:
+          type: string
+        lastRun:
+          $ref: "#/components/schemas/WorkflowRunSummary"
+
+    WorkflowVersionListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkflowVersion"
+        nextCursor:
+          type: string
+
+    CreateRunRequest:
+      type: object
+      properties:
+        inputPayload:
+          type: object
+          additionalProperties: true
+          default: {}
+
+    WorkflowRunSummary:
+      type: object
+      required:
+        - id
+        - workflowVersionId
+        - workflowId
+        - workflowName
+        - revision
+        - status
+        - triggerType
+        - inputPayload
+        - createdAt
+        - stepCount
+        - completedStepCount
+      properties:
+        id:
+          type: string
+        workflowVersionId:
+          type: string
+        workflowId:
+          type: string
+        workflowName:
+          type: string
+        revision:
+          type: integer
+          minimum: 1
+        status:
+          $ref: "#/components/schemas/WorkflowRunStatus"
+        triggerType:
+          type: string
+          examples: [run_button]
+        inputPayload:
+          type: object
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+        stepCount:
+          type: integer
+          minimum: 0
+        completedStepCount:
+          type: integer
+          minimum: 0
+        waitingStepRunId:
+          type: string
+
+    WorkflowRunListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkflowRunSummary"
+        nextCursor:
+          type: string
+
+    WorkflowRunDetail:
+      allOf:
+        - $ref: "#/components/schemas/WorkflowRunSummary"
+        - type: object
+          required:
+            - workflow
+            - stepRuns
+            - artifactVersions
+            - decisionEvents
+            - runEvents
+            - codeWorkspaces
+          properties:
+            workflow:
+              $ref: "#/components/schemas/WorkflowYaml"
+            stepRuns:
+              type: array
+              items:
+                $ref: "#/components/schemas/StepRunDetail"
+            artifactVersions:
+              type: array
+              items:
+                $ref: "#/components/schemas/ArtifactVersion"
+            decisionEvents:
+              type: array
+              items:
+                $ref: "#/components/schemas/DecisionEvent"
+            runEvents:
+              type: array
+              items:
+                $ref: "#/components/schemas/RunEvent"
+            codeWorkspaces:
+              type: array
+              items:
+                $ref: "#/components/schemas/CodeWorkspace"
+
+    StepRunDetail:
+      type: object
+      required:
+        - id
+        - workflowRunId
+        - stepId
+        - attempt
+        - status
+        - evaluator
+        - codexOptions
+        - requiresCodeReview
+        - createdAt
+        - artifactInputs
+        - producedArtifacts
+        - decisionEvents
+        - toolInvocations
+        - contextPathEvents
+        - codexInteractions
+        - codeChangeRecords
+      properties:
+        id:
+          type: string
+        workflowRunId:
+          type: string
+        stepId:
+          type: string
+        attempt:
+          type: integer
+          minimum: 1
+        status:
+          $ref: "#/components/schemas/StepRunStatus"
+        evaluator:
+          $ref: "#/components/schemas/StepRunEvaluator"
+        upstreamStepRunId:
+          type: string
+        downstreamStepRunId:
+          type: string
+        codexThreadId:
+          type: string
+        promptSnapshot:
+          type: string
+        codexOptions:
+          type: object
+          additionalProperties: true
+          default: {}
+        codexFinalResponse:
+          type: string
+        codexUsage:
+          type: object
+          additionalProperties: true
+        codexError:
+          type: object
+          additionalProperties: true
+        codexCompletedAt:
+          type: string
+          format: date-time
+        codeWorkspaceId:
+          type: string
+        beforeCommit:
+          type: string
+        afterCommit:
+          type: string
+        requiresCodeReview:
+          type: boolean
+        staleReason:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+        artifactInputs:
+          type: array
+          items:
+            $ref: "#/components/schemas/StepRunArtifactInput"
+        producedArtifacts:
+          type: array
+          items:
+            $ref: "#/components/schemas/ArtifactVersion"
+        decisionEvents:
+          type: array
+          items:
+            $ref: "#/components/schemas/DecisionEvent"
+        toolInvocations:
+          type: array
+          items:
+            $ref: "#/components/schemas/ToolInvocation"
+        contextPathEvents:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContextPathEvent"
+        codexInteractions:
+          type: array
+          items:
+            $ref: "#/components/schemas/CodexInteractionEvent"
+        codeChangeRecords:
+          type: array
+          items:
+            $ref: "#/components/schemas/CodeChangeRecord"
+
+    StepRunArtifactInput:
+      type: object
+      required: [id, stepRunId, artifactKey, artifactVersionId, artifactVersion]
+      properties:
+        id:
+          type: string
+        stepRunId:
+          type: string
+        artifactKey:
+          type: string
+        artifactVersionId:
+          type: string
+        artifactVersion:
+          $ref: "#/components/schemas/ArtifactVersion"
+
+    ArtifactVersion:
+      type: object
+      required:
+        - id
+        - workflowRunId
+        - artifactKey
+        - version
+        - producerStepRunId
+        - status
+        - contentUri
+        - contentHash
+        - createdAt
+      properties:
+        id:
+          type: string
+        workflowRunId:
+          type: string
+        artifactKey:
+          type: string
+        version:
+          type: integer
+          minimum: 1
+        displayVersion:
+          type: string
+          examples: [v1, v2]
+        producerStepRunId:
+          type: string
+        parentVersionId:
+          type: string
+        status:
+          $ref: "#/components/schemas/ArtifactStatus"
+        contentUri:
+          type: string
+        contentHash:
+          type: string
+        filename:
+          type: string
+          description: Derived from the workflow snapshot output_artifacts declaration when available.
+        format:
+          type: string
+          enum: [markdown, plain_text]
+          description: Derived from the workflow snapshot output_artifacts declaration when available.
+        createdAt:
+          type: string
+          format: date-time
+        acceptedAt:
+          type: string
+          format: date-time
+
+    ArtifactVersionContent:
+      allOf:
+        - $ref: "#/components/schemas/ArtifactVersion"
+        - type: object
+          properties:
+            content:
+              type: string
+              description: Text content when includeContent=true and artifact is text-readable.
+            encoding:
+              type: string
+              enum: [utf-8, base64]
+              default: utf-8
+            mimeType:
+              type: string
+              examples: [text/markdown, text/plain]
+            truncated:
+              type: boolean
+              default: false
+
+    DecisionEvent:
+      type: object
+      required: [id, workflowRunId, stepRunId, source, verdict, createdAt]
+      properties:
+        id:
+          type: string
+        workflowRunId:
+          type: string
+        stepRunId:
+          type: string
+        source:
+          $ref: "#/components/schemas/DecisionSource"
+        verdict:
+          $ref: "#/components/schemas/DecisionVerdict"
+        comment:
+          type: string
+        targetStepId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    HumanDecisionRequest:
+      type: object
+      required: [verdict]
+      properties:
+        verdict:
+          $ref: "#/components/schemas/DecisionVerdict"
+        comment:
+          type: string
+        targetStepId:
+          type: string
+          description: Required when verdict=request_revision and the revision target is not the current step.
+
+    HumanDecisionResponse:
+      type: object
+      required: [decisionEvent, stepRun, workflowRun]
+      properties:
+        decisionEvent:
+          $ref: "#/components/schemas/DecisionEvent"
+        stepRun:
+          $ref: "#/components/schemas/StepRunDetail"
+        workflowRun:
+          $ref: "#/components/schemas/WorkflowRunSummary"
+
+    RerunStepRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          enum: [human_rejected, revision_requested, stale_artifact, manual_retry]
+        comment:
+          type: string
+        resetToBeforeCommit:
+          type: boolean
+          default: true
+          description: For code_agent steps, reset the worktree to beforeCommit before queueing the rerun.
+
+    RerunStepResponse:
+      type: object
+      required: [queuedStepRun, affectedStepRuns]
+      properties:
+        queuedStepRun:
+          $ref: "#/components/schemas/StepRunDetail"
+        affectedStepRuns:
+          type: array
+          items:
+            $ref: "#/components/schemas/StepRunDetail"
+
+    CodexInteractionEvent:
+      type: object
+      required: [id, stepRunId, sequence, kind, status, payload, createdAt]
+      properties:
+        id:
+          type: string
+        stepRunId:
+          type: string
+        sequence:
+          type: integer
+          minimum: 1
+        externalItemId:
+          type: string
+        kind:
+          type: string
+          examples: [agent_message, tool_call, permission_request, user_question, turn_completed, turn_failed]
+        status:
+          type: string
+          examples: [completed, pending_response, responded, failed]
+        payload:
+          type: object
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+
+    CodexInteractionResponseRequest:
+      type: object
+      required: [responseType]
+      properties:
+        responseType:
+          type: string
+          enum: [approve_permission, deny_permission, answer_question]
+        answer:
+          type: string
+          description: Required when responseType=answer_question.
+        comment:
+          type: string
+
+    CodexInteractionResponse:
+      type: object
+      required: [interactionEvent, acceptedAt]
+      properties:
+        interactionEvent:
+          $ref: "#/components/schemas/CodexInteractionEvent"
+        acceptedAt:
+          type: string
+          format: date-time
+
+    ContextPathEvent:
+      type: object
+      required: [id, stepRunId, path, type, status, createdAt]
+      properties:
+        id:
+          type: string
+        stepRunId:
+          type: string
+        path:
+          type: string
+        type:
+          type: string
+        status:
+          type: string
+          examples: [resolved, missing, skipped, denied]
+        reason:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    ToolInvocation:
+      type: object
+      required: [id, stepRunId, toolName, status, argumentsRedacted, createdAt]
+      properties:
+        id:
+          type: string
+        stepRunId:
+          type: string
+        toolName:
+          type: string
+        status:
+          type: string
+        argumentsRedacted:
+          type: object
+          additionalProperties: true
+        resultRef:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    RunEvent:
+      type: object
+      required: [id, workflowRunId, eventType, payload, createdAt]
+      properties:
+        id:
+          type: string
+        workflowRunId:
+          type: string
+        eventType:
+          type: string
+        payload:
+          type: object
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+
+    CodeWorkspace:
+      type: object
+      required: [id, workflowRunId, repoPath, baseRef, worktreePath, baseCommit, createdAt, changes]
+      properties:
+        id:
+          type: string
+        workflowRunId:
+          type: string
+        repoPath:
+          type: string
+        baseRef:
+          type: string
+        worktreePath:
+          type: string
+        baseCommit:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        changes:
+          type: array
+          items:
+            $ref: "#/components/schemas/CodeChangeRecord"
+
+    CodeChangeRecord:
+      type: object
+      required: [id, stepRunId, codeWorkspaceId, beforeCommit, status, createdAt]
+      properties:
+        id:
+          type: string
+        stepRunId:
+          type: string
+        codeWorkspaceId:
+          type: string
+        beforeCommit:
+          type: string
+        afterCommit:
+          type: string
+        diffUri:
+          type: string
+        diffHash:
+          type: string
+        status:
+          type: string
+          examples: [candidate, accepted, rejected, reverted]
+        createdAt:
+          type: string
+          format: date-time

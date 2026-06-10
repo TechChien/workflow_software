@@ -218,16 +218,40 @@ button.primary:hover:not(:disabled) {
 .resource-panel,
 .inspector-panel {
   min-height: 0;
-  overflow: auto;
   background: var(--surface);
 }
 
 .resource-panel {
+  overflow: hidden;
   border-right: 1px solid var(--line);
 }
 
 .inspector-panel {
+  overflow: auto;
   border-left: 1px solid var(--line);
+}
+
+.workbench-left,
+.workbench-middle,
+.workbench-right {
+  min-width: 0;
+  min-height: 0;
+}
+
+.left-panel-layout {
+  display: grid;
+  height: 100%;
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.left-panel-upper {
+  min-width: 0;
+}
+
+.left-panel-content {
+  min-height: 0;
+  overflow: auto;
 }
 
 .panel-header,
@@ -415,9 +439,7 @@ button.primary:hover:not(:disabled) {
   position: relative;
   min-width: 0;
   min-height: 0;
-  background:
-    linear-gradient(#f8fafc, #f8fafc),
-    radial-gradient(circle at top left, rgb(19 127 116 / 8%), transparent 34%);
+  background: #f8fafc;
 }
 
 .canvas-toolbar {
@@ -871,6 +893,14 @@ button.primary:hover:not(:disabled) {
     overflow: visible;
     border: 0;
     border-bottom: 1px solid var(--line);
+  }
+
+  .left-panel-layout {
+    height: auto;
+  }
+
+  .left-panel-content {
+    overflow: visible;
   }
 
   .canvas-panel {

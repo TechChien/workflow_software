@@ -9,8 +9,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.101.0",
     "@workflow-software/shared": "workspace:*",
     "@xyflow/react": "latest",
+    "axios": "^1.17.0",
     "lucide-react": "^1.17.0",
     "next": "latest",
     "react": "latest",
