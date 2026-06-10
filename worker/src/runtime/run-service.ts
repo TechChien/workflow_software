@@ -90,21 +90,58 @@ export async function createWorkflowRun(
   const workflowRunId = dependencies.createId?.() ?? randomUUID();
   const codeWorkspaceId = dependencies.createId?.() ?? randomUUID();
   const createWorktree = dependencies.createWorktree ?? createRunWorktree;
+  console.log("[runtime.run-service] workflow_run.create.start", {
+    workflowVersionId,
+    workflowRunId,
+    codeWorkspaceId,
+    inputKeys: Object.keys(inputPayload),
+  });
   const workflowVersion = await client.workflowVersion.findUniqueOrThrow({
     where: { id: workflowVersionId }
+  });
+  console.log("[runtime.run-service] workflow_version.loaded", {
+    workflowVersionId,
+    workflowRunId,
+    contentHash: workflowVersion.contentHash,
   });
   const definition = parseVerifiedWorkflowSnapshot(
     workflowVersion.yamlSnapshot,
     workflowVersion.contentHash
   );
+  console.log("[runtime.run-service] workflow.loaded", {
+    workflowId: definition.id,
+    workflowRunId,
+    workflowVersionId,
+    name: definition.name,
+    stepCount: definition.steps.length,
+  });
   const workspace = await createWorktree({
     workflowRunId,
     repoPath: dependencies.resolveRepoPath?.() ?? defaultRepoPath(),
     baseRef: dependencies.baseRef ?? DEFAULT_CODE_BASE_REF,
     worktreeRoot: dependencies.resolveWorktreeRoot?.() ?? defaultWorktreeRoot()
   });
+  console.log("[runtime.run-service] code_workspace.created", {
+    workflowRunId,
+    codeWorkspaceId,
+    repoPath: workspace.repoPath,
+    baseRef: workspace.baseRef,
+    worktreePath: workspace.worktreePath,
+    baseCommit: workspace.baseCommit,
+  });
+  const stepRuns = createStepRuns(definition, codeWorkspaceId);
+  console.log("[runtime.run-service] step_runs.prepared", {
+    workflowRunId,
+    codeWorkspaceId,
+    steps: stepRuns.map((stepRun) => ({
+      stepId: stepRun.stepId,
+      status: stepRun.status,
+      evaluator: stepRun.evaluator,
+      requiresCodeReview: stepRun.requiresCodeReview,
+    })),
+  });
 
-  return client.workflowRun.create({
+  const created = await client.workflowRun.create({
     data: {
       id: workflowRunId,
       workflowVersionId,
@@ -113,7 +150,7 @@ export async function createWorkflowRun(
         create: [createCodeWorkspace(workspace, codeWorkspaceId)]
       },
       stepRuns: {
-        create: createStepRuns(definition, codeWorkspaceId)
+        create: stepRuns
       }
     },
     include: {
@@ -121,4 +158,12 @@ export async function createWorkflowRun(
       stepRuns: true
     }
   });
+  console.log("[runtime.run-service] workflow_run.create.complete", {
+    workflowVersionId,
+    workflowRunId,
+    codeWorkspaceId,
+    stepCount: stepRuns.length,
+  });
+
+  return created;
 }

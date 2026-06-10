@@ -145,7 +145,7 @@ async function markWorkflowRunRunning(
   workflowRunId: string,
   now: Date,
 ) {
-  await client.workflowRun.updateMany({
+  const result = await client.workflowRun.updateMany({
     where: {
       id: workflowRunId,
       status: "PENDING",
@@ -155,6 +155,12 @@ async function markWorkflowRunRunning(
       startedAt: now,
     },
   });
+  console.log("[runtime.step-runner] workflow.status", {
+    workflowRunId,
+    from: "PENDING",
+    to: "RUNNING",
+    updated: result.count,
+  });
 }
 
 async function markWorkflowRunFailed(
@@ -162,7 +168,7 @@ async function markWorkflowRunFailed(
   workflowRunId: string,
   now: Date,
 ) {
-  await client.workflowRun.updateMany({
+  const result = await client.workflowRun.updateMany({
     where: {
       id: workflowRunId,
       status: {
@@ -173,6 +179,12 @@ async function markWorkflowRunFailed(
       status: "FAILED",
       completedAt: now,
     },
+  });
+  console.log("[runtime.step-runner] workflow.status", {
+    workflowRunId,
+    from: ["PENDING", "RUNNING", "WAITING"],
+    to: "FAILED",
+    updated: result.count,
   });
 }
 
@@ -191,6 +203,11 @@ async function markStepRunFailed(
   });
 
   if (!current || (current.status === "FAILED" && current.codexError)) {
+    console.log("[runtime.step-runner] step.fail.skipped", {
+      stepRunId,
+      reason: !current ? "missing_step_run" : "already_failed_with_error",
+      status: current?.status,
+    });
     return;
   }
 
@@ -201,6 +218,11 @@ async function markStepRunFailed(
       codexError: current.codexError ?? serializeError(error),
       completedAt: now,
     },
+  });
+  console.log("[runtime.step-runner] step.status", {
+    stepRunId,
+    from: current.status,
+    to: "FAILED",
   });
 }
 
@@ -223,6 +245,12 @@ async function markStepRunAccepted(
   if (result.count !== 1) {
     throw new Error(`StepRun ${stepRunId} was not CODEX_COMPLETED`);
   }
+  console.log("[runtime.step-runner] step.status", {
+    stepRunId,
+    from: "CODEX_COMPLETED",
+    to: "ACCEPTED",
+    updated: result.count,
+  });
 }
 
 async function markStepRunRejected(
@@ -244,6 +272,12 @@ async function markStepRunRejected(
   if (result.count !== 1) {
     throw new Error(`StepRun ${stepRunId} was not CODEX_COMPLETED`);
   }
+  console.log("[runtime.step-runner] step.status", {
+    stepRunId,
+    from: "CODEX_COMPLETED",
+    to: "REJECTED",
+    updated: result.count,
+  });
 }
 
 async function persistDecision(
@@ -254,6 +288,12 @@ async function persistDecision(
     decision: EvaluatorDecision;
   },
 ) {
+  console.log("[runtime.step-runner] decision.persist.start", {
+    workflowRunId: input.workflowRunId,
+    stepRunId: input.stepRunId,
+    source: input.decision.source,
+    verdict: input.decision.verdict,
+  });
   await client.decisionEvent.create({
     data: {
       workflowRunId: input.workflowRunId,
@@ -262,6 +302,12 @@ async function persistDecision(
       verdict: input.decision.verdict,
       comment: input.decision.comment,
     },
+  });
+  console.log("[runtime.step-runner] decision.persist.complete", {
+    workflowRunId: input.workflowRunId,
+    stepRunId: input.stepRunId,
+    source: input.decision.source,
+    verdict: input.decision.verdict,
   });
 }
 
@@ -305,6 +351,13 @@ async function readyDownstreamStep(
       `Downstream StepRun ${input.downstreamStepId} was not PENDING`,
     );
   }
+  console.log("[runtime.step-runner] downstream.status", {
+    workflowRunId: input.workflowRunId,
+    downstreamStepId: input.downstreamStepId,
+    from: "PENDING",
+    to: "READY",
+    updated: result.count,
+  });
 }
 
 async function completeWorkflowRun(
@@ -312,7 +365,7 @@ async function completeWorkflowRun(
   workflowRunId: string,
   now: Date,
 ) {
-  await client.workflowRun.updateMany({
+  const result = await client.workflowRun.updateMany({
     where: {
       id: workflowRunId,
       status: "RUNNING",
@@ -321,6 +374,12 @@ async function completeWorkflowRun(
       status: "COMPLETED",
       completedAt: now,
     },
+  });
+  console.log("[runtime.step-runner] workflow.status", {
+    workflowRunId,
+    from: "RUNNING",
+    to: "COMPLETED",
+    updated: result.count,
   });
 }
 
@@ -365,6 +424,13 @@ async function resolveCodeWorkspaceWorkingDirectory(
     throw new Error(`StepRun ${input.stepRunId} does not have a CodeWorkspace`);
   }
 
+  console.log("[runtime.step-runner] workspace.resolved", {
+    workflowRunId: input.workflowRunId,
+    stepRunId: input.stepRunId,
+    codeWorkspaceId: input.codeWorkspaceId,
+    workingDirectory: workspace.worktreePath,
+  });
+
   return workspace.worktreePath;
 }
 
@@ -403,8 +469,19 @@ export async function runNextReadyStep(
   });
 
   if (!stepRun) {
+    console.log("[runtime.step-runner] poll.no_ready_step");
     return { picked: false };
   }
+
+  console.log("[runtime.step-runner] poll.picked_step", {
+    workflowId: stepRun.workflowRun.workflowVersion.workflowId,
+    workflowRunId: stepRun.workflowRunId,
+    stepRunId: stepRun.id,
+    stepId: stepRun.stepId,
+    status: "READY",
+    evaluator: stepRun.evaluator,
+    codeWorkspaceId: stepRun.codeWorkspaceId,
+  });
 
   const resultBase = {
     picked: true as const,
@@ -427,16 +504,46 @@ export async function runNextReadyStep(
       );
     }
 
+    console.log("[runtime.step-runner] workflow.loaded", {
+      workflowId: stepRun.workflowRun.workflowVersion.workflowId,
+      workflowRunId: stepRun.workflowRunId,
+      stepRunId: stepRun.id,
+      stepId: step.id,
+      stepType: step.type,
+      upstreamStepId: step.upstream,
+      downstreamStepId: step.downstream,
+      evaluator: stepRun.evaluator,
+      totalSteps: workflow.steps.length,
+    });
+
     await markWorkflowRunRunning(client, stepRun.workflowRunId, now());
     const workingDirectory = await resolveWorkingDirectory({
       stepRunId: stepRun.id,
       workflowRunId: stepRun.workflowRunId,
       codeWorkspaceId: stepRun.codeWorkspaceId,
     });
+    console.log("[runtime.step-runner] working_directory.ready", {
+      workflowRunId: stepRun.workflowRunId,
+      stepRunId: stepRun.id,
+      workingDirectory,
+    });
     const artifactStoreRoot = await resolveArtifactStoreRoot();
+    console.log("[runtime.step-runner] artifact_store.ready", {
+      workflowRunId: stepRun.workflowRunId,
+      stepRunId: stepRun.id,
+      artifactStoreRoot,
+    });
     const artifactClient = stepNeedsArtifactRuntime(step)
       ? requireArtifactRuntimeClient(client)
       : undefined;
+    console.log("[runtime.step-runner] artifact_runtime", {
+      workflowRunId: stepRun.workflowRunId,
+      stepRunId: stepRun.id,
+      enabled: Boolean(artifactClient),
+      contextPaths: step.context_paths.length,
+      inputArtifacts: step.input_artifacts.length,
+      outputArtifacts: step.output_artifacts.length,
+    });
     const runtimeContext = artifactClient
       ? await prepareCodexRuntimeContext({
           client: artifactClient,
@@ -449,10 +556,38 @@ export async function runNextReadyStep(
         })
       : undefined;
 
+    if (runtimeContext) {
+      console.log("[runtime.step-runner] runtime_context.ready", {
+        workflowRunId: stepRun.workflowRunId,
+        stepRunId: stepRun.id,
+        contextPaths: runtimeContext.contextPaths.length,
+        inputArtifacts: runtimeContext.inputArtifacts.length,
+        outputArtifacts: runtimeContext.outputArtifacts.length,
+      });
+    }
+
+    console.log("[runtime.step-runner] codex_executor.start", {
+      workflowRunId: stepRun.workflowRunId,
+      stepRunId: stepRun.id,
+      stepId: step.id,
+      stepType: step.type,
+      workingDirectory,
+    });
     const executionResult = await executeStepRun({
       stepRunId: stepRun.id,
       workingDirectory,
       ...(runtimeContext ? { runtimeContext } : {}),
+    });
+    console.log("[runtime.step-runner] codex_executor.complete", {
+      workflowRunId: stepRun.workflowRunId,
+      stepRunId: stepRun.id,
+      threadId:
+        executionResult &&
+        typeof executionResult === "object" &&
+        "threadId" in executionResult
+          ? (executionResult as { threadId?: unknown }).threadId
+          : undefined,
+      finalResponseLength: extractCodexFinalResponse(executionResult)?.length ?? 0,
     });
 
     if (
@@ -460,6 +595,11 @@ export async function runNextReadyStep(
       runtimeContext.outputArtifacts.length > 0 &&
       artifactClient
     ) {
+      console.log("[runtime.step-runner] output_artifacts.persist.start", {
+        workflowRunId: stepRun.workflowRunId,
+        stepRunId: stepRun.id,
+        count: runtimeContext.outputArtifacts.length,
+      });
       await persistDeclaredOutputArtifacts({
         client: artifactClient,
         workflowId: stepRun.workflowRun.workflowVersion.workflowId,
@@ -468,8 +608,20 @@ export async function runNextReadyStep(
         artifactStoreRoot,
         outputArtifacts: runtimeContext.outputArtifacts,
       });
+      console.log("[runtime.step-runner] output_artifacts.persist.complete", {
+        workflowRunId: stepRun.workflowRunId,
+        stepRunId: stepRun.id,
+        count: runtimeContext.outputArtifacts.length,
+      });
     }
 
+    console.log("[runtime.step-runner] evaluator.start", {
+      workflowId: stepRun.workflowRun.workflowVersion.workflowId,
+      workflowRunId: stepRun.workflowRunId,
+      stepRunId: stepRun.id,
+      stepId: step.id,
+      evaluator: stepRun.evaluator,
+    });
     const evaluation = await evaluateStep({
       stepRunId: stepRun.id,
       evaluator: stepRun.evaluator,
@@ -481,6 +633,15 @@ export async function runNextReadyStep(
       codexFinalResponse: extractCodexFinalResponse(executionResult),
       ...(runtimeContext ? { runtimeContext } : {}),
     });
+    console.log("[runtime.step-runner] evaluator.complete", {
+      workflowRunId: stepRun.workflowRunId,
+      stepRunId: stepRun.id,
+      finalVerdict: evaluation.finalVerdict,
+      decisions: evaluation.decisions.map((decision) => ({
+        source: decision.source,
+        verdict: decision.verdict,
+      })),
+    });
     await persistDecisions(client, {
       workflowRunId: stepRun.workflowRunId,
       stepRunId: stepRun.id,
@@ -488,6 +649,12 @@ export async function runNextReadyStep(
     });
 
     if (evaluation.finalVerdict !== DecisionVerdict.APPROVE) {
+      console.log("[runtime.step-runner] step.rejected", {
+        workflowRunId: stepRun.workflowRunId,
+        stepRunId: stepRun.id,
+        stepId: step.id,
+        finalVerdict: evaluation.finalVerdict,
+      });
       if (artifactClient) {
         await rejectProducedArtifacts({
           client: artifactClient,
@@ -505,11 +672,25 @@ export async function runNextReadyStep(
       };
     }
 
+    console.log("[runtime.step-runner] step.approved", {
+      workflowRunId: stepRun.workflowRunId,
+      stepRunId: stepRun.id,
+      stepId: step.id,
+      finalVerdict: evaluation.finalVerdict,
+    });
     if (artifactClient) {
+      console.log("[runtime.step-runner] output_artifacts.accept.start", {
+        workflowRunId: stepRun.workflowRunId,
+        stepRunId: stepRun.id,
+      });
       await acceptProducedArtifacts({
         client: artifactClient,
         stepRunId: stepRun.id,
         now: now(),
+      });
+      console.log("[runtime.step-runner] output_artifacts.accept.complete", {
+        workflowRunId: stepRun.workflowRunId,
+        stepRunId: stepRun.id,
       });
     }
 
@@ -530,6 +711,18 @@ export async function runNextReadyStep(
     };
   } catch (error) {
     if (isReadyRaceError(error)) {
+      console.log("[runtime.step-runner] step.race_lost", {
+        workflowRunId: stepRun.workflowRunId,
+        stepRunId: stepRun.id,
+        stepId: stepRun.stepId,
+        error:
+          error instanceof Error
+            ? {
+                name: error.name,
+                message: error.message,
+              }
+            : { message: String(error) },
+      });
       return {
         ...resultBase,
         outcome: "race_lost",
@@ -539,6 +732,22 @@ export async function runNextReadyStep(
     const failureTime = now();
     await markStepRunFailed(client, stepRun.id, error, failureTime);
     await markWorkflowRunFailed(client, stepRun.workflowRunId, failureTime);
+    console.log("[runtime.step-runner] step.failed", {
+      workflowRunId: stepRun.workflowRunId,
+      stepRunId: stepRun.id,
+      stepId: stepRun.stepId,
+      error:
+        error instanceof Error
+          ? {
+              name: error.name,
+              message: error.message,
+              code:
+                "code" in error && typeof (error as { code?: unknown }).code === "string"
+                  ? (error as { code: string }).code
+                  : undefined,
+            }
+          : { message: String(error) },
+    });
 
     return {
       ...resultBase,

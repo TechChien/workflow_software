@@ -222,10 +222,29 @@ async function readOutputArtifactSnapshots(
   runtimeContext: CodexRuntimePromptContext | undefined
 ) {
   if (!runtimeContext?.outputArtifacts.length) {
+    console.log("[runtime.evaluator] artifacts.snapshot.skipped", {
+      reason: "no_declared_output_artifacts"
+    });
     return [];
   }
 
-  return Promise.all(runtimeContext.outputArtifacts.map(readOutputArtifactSnapshot));
+  console.log("[runtime.evaluator] artifacts.snapshot.start", {
+    count: runtimeContext.outputArtifacts.length,
+    artifacts: runtimeContext.outputArtifacts.map((artifact) => ({
+      artifact: artifact.artifact,
+      filename: artifact.filename,
+      path: artifact.promptPath
+    }))
+  });
+  const artifacts = await Promise.all(
+    runtimeContext.outputArtifacts.map(readOutputArtifactSnapshot)
+  );
+  console.log("[runtime.evaluator] artifacts.snapshot.complete", {
+    count: artifacts.length,
+    truncated: artifacts.filter((artifact) => artifact.truncated).length
+  });
+
+  return artifacts;
 }
 
 function formatCriteria(criteria: string[]) {
@@ -340,6 +359,11 @@ function parseEvaluatorOutput(finalResponse: string) {
     );
   }
 
+  console.log("[runtime.evaluator] output.parsed", {
+    verdict: result.data.verdict,
+    commentLength: result.data.comment.length
+  });
+
   return result.data;
 }
 
@@ -347,18 +371,41 @@ async function runCodexEvaluator(
   input: EvaluateStepInput,
   dependencies: Required<EvaluatorRunnerDependencies>
 ): Promise<EvaluatorDecision> {
+  console.log("[runtime.evaluator] codex_evaluator.start", {
+    workflowId: input.workflowId,
+    workflowRunId: input.workflowRunId,
+    stepRunId: input.stepRunId,
+    stepId: input.step.id,
+    evaluator: input.evaluator,
+    workingDirectory: input.workingDirectory
+  });
   const artifacts = await readOutputArtifactSnapshots(input.runtimeContext);
   const prompt = buildEvaluatorPrompt(input, artifacts);
   const threadOptions = buildCodexEvaluatorThreadOptions(
     input.workingDirectory,
     dependencies.settings
   );
+  console.log("[runtime.evaluator] codex_evaluator.prompt.ready", {
+    workflowRunId: input.workflowRunId,
+    stepRunId: input.stepRunId,
+    promptLength: prompt.length,
+    artifactCount: artifacts.length,
+    model: threadOptions.model,
+    modelReasoningEffort: threadOptions.modelReasoningEffort,
+    sandboxMode: threadOptions.sandboxMode,
+    approvalPolicy: threadOptions.approvalPolicy,
+    timeoutMs: dependencies.settings.timeoutMs
+  });
   const abortState = createRunAbortState(input.signal, dependencies.settings.timeoutMs);
   let finalResponse: string | undefined;
   let completed = false;
   let terminalFailure: CodexEvaluatorError | undefined;
 
   try {
+    console.log("[runtime.evaluator] codex_evaluator.turn.start", {
+      workflowRunId: input.workflowRunId,
+      stepRunId: input.stepRunId
+    });
     const events = await dependencies.gateway.runTurn({
       prompt,
       threadOptions,
@@ -367,16 +414,40 @@ async function runCodexEvaluator(
     });
 
     for await (const event of events) {
+      if (event.type === "thread.started") {
+        console.log("[runtime.evaluator] codex_evaluator.thread.started", {
+          workflowRunId: input.workflowRunId,
+          stepRunId: input.stepRunId,
+          threadId: event.thread_id
+        });
+      }
+
       if (event.type === "item.completed" && event.item.type === "agent_message") {
         finalResponse = event.item.text;
+        console.log("[runtime.evaluator] codex_evaluator.agent_message.completed", {
+          workflowRunId: input.workflowRunId,
+          stepRunId: input.stepRunId,
+          messageLength: finalResponse.length
+        });
       }
 
       if (event.type === "turn.completed") {
         completed = true;
+        console.log("[runtime.evaluator] codex_evaluator.turn.completed", {
+          workflowRunId: input.workflowRunId,
+          stepRunId: input.stepRunId,
+          usage: event.usage
+        });
       }
 
       terminalFailure ??= failureFromTerminalEvent(event);
       if (terminalFailure) {
+        console.log("[runtime.evaluator] codex_evaluator.terminal_failure", {
+          workflowRunId: input.workflowRunId,
+          stepRunId: input.stepRunId,
+          code: terminalFailure.code,
+          message: terminalFailure.message
+        });
         break;
       }
     }
@@ -401,6 +472,13 @@ async function runCodexEvaluator(
 
     const output = parseEvaluatorOutput(finalResponse);
 
+    console.log("[runtime.evaluator] codex_evaluator.complete", {
+      workflowRunId: input.workflowRunId,
+      stepRunId: input.stepRunId,
+      verdict: output.verdict,
+      commentLength: output.comment.length
+    });
+
     return {
       stepRunId: input.stepRunId,
       source: DecisionSource.EVALUATOR,
@@ -408,9 +486,20 @@ async function runCodexEvaluator(
       comment: output.comment
     };
   } catch (error) {
-    throw failureFromError(error, input, abortState.timedOut());
+    const evaluatorError = failureFromError(error, input, abortState.timedOut());
+    console.log("[runtime.evaluator] codex_evaluator.failed", {
+      workflowRunId: input.workflowRunId,
+      stepRunId: input.stepRunId,
+      code: evaluatorError.code,
+      message: evaluatorError.message
+    });
+    throw evaluatorError;
   } finally {
     abortState.dispose();
+    console.log("[runtime.evaluator] codex_evaluator.cleanup", {
+      workflowRunId: input.workflowRunId,
+      stepRunId: input.stepRunId
+    });
   }
 }
 
@@ -427,7 +516,25 @@ export async function evaluateStepArtifact(
   input: EvaluateStepInput,
   dependencies: EvaluatorRunnerDependencies = {}
 ): Promise<EvaluateStepResult> {
+  console.log("[runtime.evaluator] evaluate.start", {
+    workflowId: input.workflowId,
+    workflowRunId: input.workflowRunId,
+    stepRunId: input.stepRunId,
+    stepId: input.step.id,
+    evaluator: input.evaluator
+  });
+
   if (input.evaluator === StepRunEvaluator.HUMAN_REVIEW) {
+    console.log("[runtime.evaluator] human_review.auto_approve", {
+      workflowRunId: input.workflowRunId,
+      stepRunId: input.stepRunId,
+      verdict: DecisionVerdict.APPROVE
+    });
+    console.log("[runtime.evaluator] evaluate.complete", {
+      workflowRunId: input.workflowRunId,
+      stepRunId: input.stepRunId,
+      finalVerdict: DecisionVerdict.APPROVE
+    });
     return {
       decisions: [humanAutoApproveDecision(input.stepRunId)],
       finalVerdict: DecisionVerdict.APPROVE
@@ -439,16 +546,39 @@ export async function evaluateStepArtifact(
     settings: dependencies.settings ?? runtimeSettings()
   };
   const evaluatorDecision = await runCodexEvaluator(input, resolvedDependencies);
+  console.log("[runtime.evaluator] evaluator_decision", {
+    workflowRunId: input.workflowRunId,
+    stepRunId: input.stepRunId,
+    source: evaluatorDecision.source,
+    verdict: evaluatorDecision.verdict
+  });
 
   if (
     input.evaluator === StepRunEvaluator.MIXED &&
     evaluatorDecision.verdict === DecisionVerdict.APPROVE
   ) {
+    console.log("[runtime.evaluator] mixed.auto_human_approve", {
+      workflowRunId: input.workflowRunId,
+      stepRunId: input.stepRunId,
+      evaluatorVerdict: evaluatorDecision.verdict,
+      finalVerdict: DecisionVerdict.APPROVE
+    });
+    console.log("[runtime.evaluator] evaluate.complete", {
+      workflowRunId: input.workflowRunId,
+      stepRunId: input.stepRunId,
+      finalVerdict: DecisionVerdict.APPROVE
+    });
     return {
       decisions: [evaluatorDecision, humanAutoApproveDecision(input.stepRunId)],
       finalVerdict: DecisionVerdict.APPROVE
     };
   }
+
+  console.log("[runtime.evaluator] evaluate.complete", {
+    workflowRunId: input.workflowRunId,
+    stepRunId: input.stepRunId,
+    finalVerdict: evaluatorDecision.verdict
+  });
 
   return {
     decisions: [evaluatorDecision],

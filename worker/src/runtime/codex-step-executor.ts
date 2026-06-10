@@ -305,10 +305,41 @@ export async function executeStepRunWithCodexCore(
   input: ExecuteStepRunWithCodexInput,
   dependencies: CodexExecutorDependencies
 ): Promise<CodexExecutionResult> {
+  console.log("[runtime.codex-executor] start", {
+    stepRunId: input.stepRunId,
+    workingDirectory: input.workingDirectory,
+  });
   await assertWorkingDirectory(input.workingDirectory);
+  console.log("[runtime.codex-executor] working_directory.valid", {
+    stepRunId: input.stepRunId,
+    workingDirectory: input.workingDirectory,
+  });
 
   const source = await dependencies.recorder.loadSource(input.stepRunId);
-  const { prompt: workflowPrompt, acceptanceCriteria } = resolveCodexStepPrompt(source);
+  console.log("[runtime.codex-executor] source.loaded", {
+    stepRunId: input.stepRunId,
+    workflowStepId: source.stepId,
+    contentHash: source.contentHash,
+  });
+  const {
+    stepType,
+    prompt: workflowPrompt,
+    acceptanceCriteria,
+  } = resolveCodexStepPrompt(source);
+  console.log("[runtime.codex-executor] prompt.resolved", {
+    stepRunId: input.stepRunId,
+    workflowStepId: source.stepId,
+    stepType,
+    promptLength: workflowPrompt.length,
+    acceptanceCriteriaCount: acceptanceCriteria.length,
+    runtimeContext: input.runtimeContext
+      ? {
+          contextPaths: input.runtimeContext.contextPaths.length,
+          inputArtifacts: input.runtimeContext.inputArtifacts.length,
+          outputArtifacts: input.runtimeContext.outputArtifacts.length,
+        }
+      : undefined,
+  });
   const prompt = buildCodexRuntimePrompt(
     workflowPrompt,
     acceptanceCriteria,
@@ -323,6 +354,19 @@ export async function executeStepRunWithCodexCore(
     promptSnapshot: prompt,
     codexOptions: buildCodexOptionsSnapshot(threadOptions)
   });
+  console.log("[runtime.codex-executor] recorder.mark_started", {
+    stepRunId: input.stepRunId,
+    promptSnapshotLength: prompt.length,
+    model: threadOptions.model,
+    modelReasoningEffort: threadOptions.modelReasoningEffort,
+    sandboxMode: threadOptions.sandboxMode,
+    approvalPolicy: threadOptions.approvalPolicy,
+    additionalDirectories:
+      "additionalDirectories" in threadOptions &&
+      Array.isArray(threadOptions.additionalDirectories)
+        ? threadOptions.additionalDirectories.length
+        : 0,
+  });
 
   const abortState = createRunAbortState(input.signal, dependencies.settings.timeoutMs);
   let sequence = 0;
@@ -333,6 +377,10 @@ export async function executeStepRunWithCodexCore(
   let terminalFailure: CodexExecutionError | undefined;
 
   try {
+    console.log("[runtime.codex-executor] turn.start", {
+      stepRunId: input.stepRunId,
+      timeoutMs: dependencies.settings.timeoutMs,
+    });
     const events = await dependencies.gateway.runTurn({
       prompt,
       threadOptions,
@@ -342,17 +390,33 @@ export async function executeStepRunWithCodexCore(
     for await (const event of events) {
       if (event.type === "thread.started") {
         threadId = event.thread_id;
+        console.log("[runtime.codex-executor] thread.started", {
+          stepRunId: input.stepRunId,
+          threadId,
+        });
         await dependencies.recorder.recordThreadStarted(input.stepRunId, event.thread_id);
         continue;
       }
 
       if (event.type === "item.completed" && event.item.type === "agent_message") {
         finalResponse = event.item.text;
+        console.log("[runtime.codex-executor] agent_message.completed", {
+          stepRunId: input.stepRunId,
+          messageLength: finalResponse.length,
+        });
       }
 
       const normalized = normalizeCodexEvent(event);
       if (normalized) {
         sequence += 1;
+        console.log("[runtime.codex-executor] event.record", {
+          stepRunId: input.stepRunId,
+          sequence,
+          eventType: event.type,
+          kind: normalized.kind,
+          status: normalized.status,
+          externalItemId: normalized.externalItemId,
+        });
         await dependencies.recorder.appendEvent(input.stepRunId, {
           sequence,
           ...normalized
@@ -362,10 +426,19 @@ export async function executeStepRunWithCodexCore(
       if (event.type === "turn.completed") {
         usage = event.usage;
         completed = true;
+        console.log("[runtime.codex-executor] turn.completed", {
+          stepRunId: input.stepRunId,
+          usage,
+        });
       }
 
       terminalFailure ??= failureFromTerminalEvent(event);
       if (terminalFailure) {
+        console.log("[runtime.codex-executor] terminal_failure", {
+          stepRunId: input.stepRunId,
+          code: terminalFailure.code,
+          message: terminalFailure.message,
+        });
         break;
       }
     }
@@ -400,6 +473,12 @@ export async function executeStepRunWithCodexCore(
       finalResponse,
       usage
     });
+    console.log("[runtime.codex-executor] recorder.mark_completed", {
+      stepRunId: input.stepRunId,
+      threadId,
+      finalResponseLength: finalResponse.length,
+      usage,
+    });
 
     return {
       stepRunId: input.stepRunId,
@@ -409,9 +488,18 @@ export async function executeStepRunWithCodexCore(
     };
   } catch (error) {
     const executionError = failureFromError(error, input, abortState.timedOut());
+    console.log("[runtime.codex-executor] failed", {
+      stepRunId: input.stepRunId,
+      code: executionError.code,
+      message: executionError.message,
+      eventRecorded: executionError.eventRecorded,
+    });
     await persistFailure(dependencies.recorder, input.stepRunId, sequence + 1, executionError);
     throw executionError;
   } finally {
     abortState.dispose();
+    console.log("[runtime.codex-executor] cleanup", {
+      stepRunId: input.stepRunId,
+    });
   }
 }
