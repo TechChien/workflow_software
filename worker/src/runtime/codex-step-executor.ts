@@ -75,7 +75,8 @@ export function resolveCodexStepPrompt(source: CodexStepRunSource) {
 
   return {
     stepType: step.type,
-    prompt: step.prompt
+    prompt: step.prompt,
+    acceptanceCriteria: step.acceptance.criteria
   };
 }
 
@@ -92,54 +93,77 @@ function formatRuntimePromptList(entries: Array<Record<string, unknown>>) {
   return JSON.stringify(entries, null, 2);
 }
 
+function formatAcceptanceCriteria(criteria: string[]) {
+  return criteria.map((criterion) => `- ${criterion}`).join("\n");
+}
+
 export function buildCodexRuntimePrompt(
   prompt: string,
-  context: CodexRuntimePromptContext | undefined
+  acceptanceCriteria: string[] = [],
+  context: CodexRuntimePromptContext | undefined = undefined
 ) {
-  if (!hasRuntimeContext(context)) {
+  const hasAcceptanceCriteria = acceptanceCriteria.length > 0;
+
+  if (!hasRuntimeContext(context) && !hasAcceptanceCriteria) {
     return prompt;
   }
 
-  const runtimeContext = context as CodexRuntimePromptContext;
+  const sections: string[] = [];
 
-  return [
-    "## Workflow Runtime Contract",
-    "",
-    "Declared output artifacts are authoritative. If the step prompt mentions another output filename, ignore that filename and produce only the declared artifact files below.",
-    "Do not invent additional artifact outputs. Extra files mentioned by the prompt are workspace side effects and will not be accepted as artifacts.",
-    "",
-    "### Context Paths",
-    formatRuntimePromptList(
-      runtimeContext.contextPaths.map((contextPath) => ({
-        path: contextPath.promptPath,
-        type: contextPath.type
-      }))
-    ),
-    "",
-    "### Input Artifacts",
-    formatRuntimePromptList(
-      runtimeContext.inputArtifacts.map((artifact) => ({
-        artifact: artifact.artifact,
-        version: artifact.version,
-        path: artifact.promptPath
-      }))
-    ),
-    "",
-    "### Output Artifacts",
-    formatRuntimePromptList(
-      runtimeContext.outputArtifacts.map((artifact) => ({
-        artifact: artifact.artifact,
-        filename: artifact.filename,
-        path: artifact.promptPath
-      }))
-    ),
-    "",
-    "Write every declared output artifact to its exact path before finishing the turn.",
-    "",
-    "## Step Prompt",
-    "",
-    prompt
-  ].join("\n");
+  if (hasRuntimeContext(context)) {
+    const runtimeContext = context as CodexRuntimePromptContext;
+
+    sections.push(
+      "## Workflow Runtime Contract",
+      "",
+      "Declared output artifacts are authoritative. If the step prompt mentions another output filename, ignore that filename and produce only the declared artifact files below.",
+      "Do not invent additional artifact outputs. Extra files mentioned by the prompt are workspace side effects and will not be accepted as artifacts.",
+      "",
+      "### Context Paths",
+      formatRuntimePromptList(
+        runtimeContext.contextPaths.map((contextPath) => ({
+          path: contextPath.promptPath,
+          type: contextPath.type
+        }))
+      ),
+      "",
+      "### Input Artifacts",
+      formatRuntimePromptList(
+        runtimeContext.inputArtifacts.map((artifact) => ({
+          artifact: artifact.artifact,
+          version: artifact.version,
+          path: artifact.promptPath
+        }))
+      ),
+      "",
+      "### Output Artifacts",
+      formatRuntimePromptList(
+        runtimeContext.outputArtifacts.map((artifact) => ({
+          artifact: artifact.artifact,
+          filename: artifact.filename,
+          path: artifact.promptPath
+        }))
+      ),
+      "",
+      "Write every declared output artifact to its exact path before finishing the turn.",
+      ""
+    );
+  }
+
+  if (hasAcceptanceCriteria) {
+    sections.push(
+      "## Acceptance Criteria",
+      "",
+      formatAcceptanceCriteria(acceptanceCriteria),
+      "",
+      "Complete the step so the finished work satisfies every acceptance criterion.",
+      ""
+    );
+  }
+
+  sections.push("## Step Prompt", "", prompt);
+
+  return sections.join("\n");
 }
 
 export function buildCodexAdditionalDirectories(
@@ -284,8 +308,12 @@ export async function executeStepRunWithCodexCore(
   await assertWorkingDirectory(input.workingDirectory);
 
   const source = await dependencies.recorder.loadSource(input.stepRunId);
-  const { prompt: workflowPrompt } = resolveCodexStepPrompt(source);
-  const prompt = buildCodexRuntimePrompt(workflowPrompt, input.runtimeContext);
+  const { prompt: workflowPrompt, acceptanceCriteria } = resolveCodexStepPrompt(source);
+  const prompt = buildCodexRuntimePrompt(
+    workflowPrompt,
+    acceptanceCriteria,
+    input.runtimeContext
+  );
   const threadOptions = buildCodexThreadOptions(input.workingDirectory, dependencies.settings, {
     additionalDirectories: buildCodexAdditionalDirectories(input.runtimeContext)
   });

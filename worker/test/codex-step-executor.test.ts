@@ -30,7 +30,11 @@ const usage: Usage = {
   reasoning_output_tokens: 1
 };
 
-function sourceFor(prompt: string, type: "agent" | "code_agent" = "agent") {
+function sourceFor(
+  prompt: string,
+  type: "agent" | "code_agent" = "agent",
+  acceptanceCriteria: string[] = []
+) {
   const snapshot = canonicalizeWorkflowDefinition({
     id: "workflow-1",
     name: "Codex test workflow",
@@ -49,7 +53,7 @@ function sourceFor(prompt: string, type: "agent" | "code_agent" = "agent") {
         evaluate: {
           evaluator: "mixed",
         },
-        acceptance: { criteria: [] }
+        acceptance: { criteria: acceptanceCriteria }
       }
     ],
     ui: {}
@@ -251,6 +255,36 @@ describe("executeStepRunWithCodexCore", () => {
     expect(result.threadId).toBe("thread-1");
   });
 
+  it("adds acceptance criteria from the published workflow step", async () => {
+    const recorder = new MemoryRecorder(
+      sourceFor("Write the release summary.", "agent", [
+        "The summary names each shipped feature.",
+        "The summary calls out any unresolved risks."
+      ])
+    );
+    const gateway = new FakeGateway(() => eventStream(...successfulEvents()));
+
+    await executeStepRunWithCodexCore(
+      {
+        stepRunId: "step-run-criteria",
+        workingDirectory: process.cwd()
+      },
+      dependencies(recorder, gateway)
+    );
+
+    expect(gateway.requests[0]?.prompt).toContain("## Acceptance Criteria");
+    expect(gateway.requests[0]?.prompt).toContain(
+      "- The summary names each shipped feature."
+    );
+    expect(gateway.requests[0]?.prompt).toContain(
+      "- The summary calls out any unresolved risks."
+    );
+    expect(gateway.requests[0]?.prompt).toContain(
+      "## Step Prompt\n\nWrite the release summary."
+    );
+    expect(recorder.started?.promptSnapshot).toBe(gateway.requests[0]?.prompt);
+  });
+
   it("adds the runtime artifact contract when declared outputs are present", async () => {
     const recorder = new MemoryRecorder(
       sourceFor("Write obsolete.md and extra.md, then finish.")
@@ -336,12 +370,32 @@ describe("executeStepRunWithCodexCore", () => {
 
   it("leaves prompts unchanged when the runtime context is empty", () => {
     expect(
-      buildCodexRuntimePrompt("Use the plain prompt.", {
+      buildCodexRuntimePrompt("Use the plain prompt.", [], {
         contextPaths: [],
         inputArtifacts: [],
         outputArtifacts: []
       })
     ).toBe("Use the plain prompt.");
+  });
+
+  it("adds acceptance criteria without requiring runtime artifacts", () => {
+    expect(
+      buildCodexRuntimePrompt("Use the plain prompt.", [
+        "The result includes a short changelog."
+      ])
+    ).toBe(
+      [
+        "## Acceptance Criteria",
+        "",
+        "- The result includes a short changelog.",
+        "",
+        "Complete the step so the finished work satisfies every acceptance criterion.",
+        "",
+        "## Step Prompt",
+        "",
+        "Use the plain prompt."
+      ].join("\n")
+    );
   });
 
   it("returns no additional directories when runtime context has no context paths", () => {
