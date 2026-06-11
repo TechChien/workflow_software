@@ -55,7 +55,6 @@ function WorkflowWorkbenchInner() {
   const draftView = useDraftView();
   const publishedView = usePublishedWorkflowsView();
   const runHistoryView = useRunHistoryView();
-  const canRun = publishedView.workflows.length > 0;
 
   const handlePublish = async () => {
     const published = await draftView.publishDraft();
@@ -82,10 +81,11 @@ function WorkflowWorkbenchInner() {
         Skip to canvas
       </a>
       <WorkflowTopbar
-        canRun={canRun}
+        activeTab={leftTab}
         draftView={draftView}
         onPublish={handlePublish}
         onRun={() => handleRun()}
+        selectedPublishedWorkflow={publishedView.selectedWorkflow}
       />
 
       <section className={`workbench-body ${isLeftCollapsed ? "left-collapsed" : ""}`}>

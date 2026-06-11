@@ -1,21 +1,43 @@
 "use client";
 
+import { type PublishedWorkflow } from "@/mock/workflowWorkbench";
 import { type DraftViewModel } from "./hooks/useDraftView";
 import { Icon } from "./Icon";
-import { StatusBadge } from "./workbenchShared";
+import { StatusBadge, type LeftTab } from "./workbenchShared";
 
 export function WorkflowTopbar({
-  canRun,
+  activeTab,
   draftView,
   onPublish,
-  onRun
+  onRun,
+  selectedPublishedWorkflow
 }: {
-  canRun: boolean;
+  activeTab: LeftTab;
   draftView: DraftViewModel;
   onPublish: () => void | Promise<void>;
   onRun: () => void;
+  selectedPublishedWorkflow?: PublishedWorkflow;
 }) {
   const statusMessage = draftView.publishErrorMessage ?? draftView.saveErrorMessage;
+  const hasDraftCanvasNode = draftView.nodes.length > 0;
+  const isDraftTab = activeTab === "draft";
+  const isPublishedTab = activeTab === "published";
+  const canSaveDraft =
+    isDraftTab && hasDraftCanvasNode && !draftView.isSavingDraft && !draftView.isPublishingDraft;
+  const canPublishDraft =
+    isDraftTab && hasDraftCanvasNode && !draftView.isSavingDraft && !draftView.isPublishingDraft;
+  const canRun = isPublishedTab && Boolean(selectedPublishedWorkflow);
+  const draftActionTitle =
+    !isDraftTab
+      ? "Open the Draft tab to use draft actions"
+      : !hasDraftCanvasNode
+        ? "Add a node to the draft canvas first"
+        : undefined;
+  const runActionTitle = canRun
+    ? "Run selected published workflow"
+    : isPublishedTab
+      ? "Select a published workflow before running"
+      : "Open the Published tab to run a workflow";
 
   return (
     <header className="topbar">
@@ -68,8 +90,8 @@ export function WorkflowTopbar({
           type="button"
           className="toolbar-button"
           onClick={() => void draftView.saveDraft()}
-          disabled={draftView.isSavingDraft || draftView.isPublishingDraft}
-          title={draftView.saveErrorMessage}
+          disabled={!canSaveDraft}
+          title={draftView.saveErrorMessage ?? draftActionTitle}
         >
           <Icon name="save" />
           {draftView.isSavingDraft ? "Saving" : "Save Draft"}
@@ -78,12 +100,8 @@ export function WorkflowTopbar({
           type="button"
           className="toolbar-button publish-button"
           onClick={() => void onPublish()}
-          disabled={
-            draftView.validation.kind === "error" ||
-            draftView.isSavingDraft ||
-            draftView.isPublishingDraft
-          }
-          title={draftView.publishErrorMessage}
+          disabled={!canPublishDraft}
+          title={draftView.publishErrorMessage ?? draftActionTitle}
         >
           <Icon name="upload" />
           {draftView.isPublishingDraft ? "Publishing" : "Publish"}
@@ -93,7 +111,7 @@ export function WorkflowTopbar({
           className="toolbar-button primary"
           onClick={onRun}
           disabled={!canRun}
-          title={canRun ? "Run latest selected published workflow" : "Publish a workflow before running"}
+          title={runActionTitle}
         >
           <Icon name="play" />
           Run
