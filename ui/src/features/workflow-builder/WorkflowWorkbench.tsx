@@ -201,6 +201,7 @@ function LeftWorkbenchSection({
                   isLoading={draftView.isLoading}
                   workflows={draftView.workflows}
                   selectedId={draftView.selectedWorkflowId}
+                  selectedDraftStep={draftView.selectedStep}
                   onAddWorkflow={draftView.addWorkflow}
                   onSelect={draftView.selectWorkflow}
                 />

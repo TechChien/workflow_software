@@ -8,15 +8,17 @@ import {
   type EdgeChange,
   type NodeChange
 } from "@xyflow/react";
+import { useQueryClient } from "@tanstack/react-query";
 import { stringifyWorkflowYaml, type StepDefinition, type WorkflowYaml } from "@workflow-software/shared";
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type RefObject } from "react";
 import type { WorkflowSummary } from "@/lib/api/api-contract";
+import { workerApiQueryKeys } from "@/lib/api/query-keys";
 import { componentTemplates, type ComponentTemplate } from "../ComponentLibrary";
 import {
   initialNodePositions,
   type PublishedWorkflow
 } from "@/mock/workflowWorkbench";
-import { useWorkflows } from "@/services/worker-api-service";
+import { useCreateWorkflow, useUpdateWorkflowDraft, useWorkflows } from "@/services/worker-api-service";
 import {
   createEdgesFromSteps,
   createNode,
@@ -55,6 +57,8 @@ export type DraftViewModel = {
   yaml: string;
   validation: ReturnType<typeof validateDraft>;
   isDirty: boolean;
+  isSavingDraft: boolean;
+  saveErrorMessage?: string;
   addWorkflow: () => void;
   renameWorkflow: (name: string) => void;
   saveDraft: () => void;
@@ -74,10 +78,13 @@ export type DraftViewModel = {
 export function useDraftView(): DraftViewModel {
   const setLeftTab = useWorkbenchStore((state) => state.setLeftTab);
   const setViewMode = useWorkbenchStore((state) => state.setViewMode);
+  const queryClient = useQueryClient();
   const flowWrapperRef = useRef<HTMLDivElement | null>(null);
   const localDraftCounterRef = useRef(1);
   const { screenToFlowPosition } = useReactFlow();
   const workflowsQuery = useWorkflows();
+  const createWorkflowMutation = useCreateWorkflow();
+  const updateWorkflowDraftMutation = useUpdateWorkflowDraft();
   const [draftWorkflowId, setDraftWorkflowId] = useState("untitled-workflow");
   const [draftWorkflowName, setDraftWorkflowName] = useState("Untitled Workflow");
   const [draftSteps, setDraftSteps] = useState<StepDefinition[]>([]);
@@ -86,6 +93,7 @@ export function useDraftView(): DraftViewModel {
   const [selectedDraftStepId, setSelectedDraftStepId] = useState("");
   const [isDirty, setIsDirty] = useState(false);
   const [selectedDraftWorkflowId, setSelectedDraftWorkflowId] = useState("");
+  const [persistedWorkflowId, setPersistedWorkflowId] = useState<string>();
   const [localDraftUpdatedAt, setLocalDraftUpdatedAt] = useState(formatDateTime(new Date()));
   const [localDraftWorkflows, setLocalDraftWorkflows] = useState<DraftWorkflowRecord[]>([]);
 
@@ -105,9 +113,29 @@ export function useDraftView(): DraftViewModel {
     () => [...apiDraftWorkflows, ...localDraftWorkflows],
     [apiDraftWorkflows, localDraftWorkflows]
   );
+  const isSavingDraft = createWorkflowMutation.isPending || updateWorkflowDraftMutation.isPending;
+  const saveErrorMessage =
+    updateWorkflowDraftMutation.error?.message ?? createWorkflowMutation.error?.message;
 
   useEffect(() => {
     setLocalDraftWorkflows((workflows) => {
+      const hasLocalWorkflow = workflows.some((workflow) => workflow.id === draftWorkflow.id);
+      const isPersistedWorkflow = Boolean(persistedWorkflowId);
+
+      if (!hasLocalWorkflow && !isPersistedWorkflow && isDirty) {
+        return [
+          ...workflows,
+          {
+            id: draftWorkflow.id,
+            name: draftWorkflow.name,
+            workflow: draftWorkflow,
+            updatedAt: "Unsaved changes",
+            hasPublishedVersion: false,
+            isLocal: true
+          }
+        ];
+      }
+
       if (!workflows.some((workflow) => workflow.id === draftWorkflow.id)) {
         return workflows;
       }
@@ -120,13 +148,13 @@ export function useDraftView(): DraftViewModel {
               workflow: draftWorkflow,
               updatedAt: isDirty ? "Unsaved changes" : localDraftUpdatedAt,
               hasPublishedVersion: apiDraftWorkflows.some(
-                (apiWorkflow) => apiWorkflow.id === draftWorkflow.id && apiWorkflow.hasPublishedVersion
+                (apiWorkflow) => apiWorkflow.id === persistedWorkflowId && apiWorkflow.hasPublishedVersion
               )
             }
           : workflow
       );
     });
-  }, [apiDraftWorkflows, draftWorkflow, isDirty, localDraftUpdatedAt]);
+  }, [apiDraftWorkflows, draftWorkflow, isDirty, localDraftUpdatedAt, persistedWorkflowId]);
 
   const markDirty = useCallback(() => setIsDirty(true), []);
 
@@ -152,6 +180,7 @@ export function useDraftView(): DraftViewModel {
     setDraftEdges([]);
     setSelectedDraftStepId("");
     setSelectedDraftWorkflowId(workflow.id);
+    setPersistedWorkflowId(undefined);
     setLocalDraftUpdatedAt(formatDateTime(new Date()));
     setIsDirty(true);
     setViewMode("draft");
@@ -167,6 +196,7 @@ export function useDraftView(): DraftViewModel {
       setDraftEdges(createEdgesFromSteps(workflow.workflow.steps));
       setSelectedDraftStepId(workflow.workflow.steps[0]?.id ?? "");
       setSelectedDraftWorkflowId(workflow.id);
+      setPersistedWorkflowId(workflow.isLocal ? undefined : workflow.id);
       setIsDirty(workflow.isLocal && workflow.updatedAt === "Unsaved changes");
       setLocalDraftUpdatedAt(workflow.updatedAt);
       setViewMode("draft");
@@ -251,11 +281,12 @@ export function useDraftView(): DraftViewModel {
       setDraftSteps((steps) => [...steps, step]);
       setDraftNodes((nodes) => [...nodes, createNode(step, nextPosition)]);
       setSelectedDraftStepId(id);
+      setSelectedDraftWorkflowId(persistedWorkflowId ?? draftWorkflowId);
       setViewMode("draft");
       setLeftTab("draft");
       setIsDirty(true);
     },
-    [draftSteps, setDraftNodes, setLeftTab, setViewMode]
+    [draftSteps, draftWorkflowId, persistedWorkflowId, setDraftNodes, setLeftTab, setViewMode]
   );
 
   const handleDrop = useCallback(
@@ -301,15 +332,49 @@ export function useDraftView(): DraftViewModel {
 
   const renameWorkflow = useCallback((name: string) => {
     setDraftWorkflowName(name);
+    setSelectedDraftWorkflowId(persistedWorkflowId ?? draftWorkflowId);
     setIsDirty(true);
-  }, []);
+  }, [draftWorkflowId, persistedWorkflowId]);
 
-  const saveDraft = useCallback(() => {
+  const saveDraft = useCallback(async () => {
+    const body = { draftYaml: draftWorkflow };
+    const savedWorkflow = persistedWorkflowId
+      ? await updateWorkflowDraftMutation.mutateAsync({
+          workflowId: persistedWorkflowId,
+          body
+        })
+      : await createWorkflowMutation.mutateAsync(body);
+
     setIsDirty(false);
-    setSelectedDraftWorkflowId(draftWorkflow.id);
-    setLocalDraftUpdatedAt(formatDateTime(new Date()));
+    setPersistedWorkflowId(savedWorkflow.id);
+    setSelectedDraftWorkflowId(savedWorkflow.id);
+    setDraftWorkflowId(savedWorkflow.draftYaml.id);
+    setDraftWorkflowName(savedWorkflow.draftYaml.name);
+    setDraftSteps(savedWorkflow.draftYaml.steps);
+    setDraftNodes(createNodes(savedWorkflow.draftYaml.steps, initialNodePositions));
+    setDraftEdges(createEdgesFromSteps(savedWorkflow.draftYaml.steps));
+    setSelectedDraftStepId(savedWorkflow.draftYaml.steps[0]?.id ?? "");
+    setLocalDraftUpdatedAt(savedWorkflow.updatedAt);
+    setLocalDraftWorkflows((workflows) =>
+      workflows.filter(
+        (workflow) =>
+          workflow.id !== draftWorkflow.id &&
+          workflow.id !== savedWorkflow.id &&
+          workflow.workflow.id !== savedWorkflow.draftYaml.id
+      )
+    );
+    await queryClient.invalidateQueries({ queryKey: workerApiQueryKeys.workflows.all });
     setViewMode("draft");
-  }, [draftWorkflow.id, setViewMode]);
+  }, [
+    createWorkflowMutation,
+    draftWorkflow,
+    persistedWorkflowId,
+    queryClient,
+    setDraftEdges,
+    setDraftNodes,
+    setViewMode,
+    updateWorkflowDraftMutation
+  ]);
 
   const createPublishedWorkflow = useCallback(
     (revision: number): PublishedWorkflow => {
@@ -352,6 +417,7 @@ export function useDraftView(): DraftViewModel {
       setDraftEdges(createEdgesFromSteps(draftWorkflow.steps));
       setSelectedDraftStepId(draftWorkflow.steps[0]?.id ?? "");
       setSelectedDraftWorkflowId(draftWorkflow.id);
+      setPersistedWorkflowId(undefined);
       setLocalDraftUpdatedAt(formatDateTime(new Date()));
       setIsDirty(true);
       setViewMode("draft");
@@ -374,6 +440,8 @@ export function useDraftView(): DraftViewModel {
     yaml: draftYaml,
     validation,
     isDirty,
+    isSavingDraft,
+    saveErrorMessage,
     addWorkflow,
     renameWorkflow,
     saveDraft,

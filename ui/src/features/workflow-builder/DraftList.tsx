@@ -1,5 +1,6 @@
 "use client";
 
+import { type StepDefinition } from "@workflow-software/shared";
 import { type DraftWorkflowRecord } from "./hooks/useDraftView";
 import { Icon } from "./Icon";
 import { StatusBadge } from "./workbenchShared";
@@ -9,6 +10,7 @@ export function DraftList({
   isLoading,
   workflows,
   selectedId,
+  selectedDraftStep,
   onAddWorkflow,
   onSelect
 }: {
@@ -16,6 +18,7 @@ export function DraftList({
   isLoading: boolean;
   workflows: DraftWorkflowRecord[];
   selectedId: string;
+  selectedDraftStep?: StepDefinition;
   onAddWorkflow: () => void;
   onSelect: (workflow: DraftWorkflowRecord) => void;
 }) {
@@ -45,25 +48,33 @@ export function DraftList({
         </div>
       ) : null}
       <div className="record-list">
-        {workflows.map((workflow) => (
-          <article
-            key={workflow.id}
-            className={`record-row ${selectedId === workflow.id ? "active" : ""}`}
-          >
-            <button type="button" className="record-main" onClick={() => onSelect(workflow)}>
-              <span className="record-title">{workflow.name}</span>
-              <span>{workflow.workflow.steps.length} steps</span>
-              <span>{workflow.updatedAt}</span>
-            </button>
-            <span className="record-footer">
-              <StatusBadge
-                status={workflow.hasPublishedVersion ? "published" : "draft"}
-                label={workflow.hasPublishedVersion ? "Published" : "Draft"}
-              />
-              {workflow.isLocal ? <span>Current</span> : null}
-            </span>
-          </article>
-        ))}
+        {workflows.map((workflow) => {
+          const isSelectedWorkflow = selectedId === workflow.id;
+          const hasSelectedStep = workflow.workflow.steps.some(
+            (step) => step.id === selectedDraftStep?.id
+          );
+          const isCurrent = selectedDraftStep ? hasSelectedStep : isSelectedWorkflow;
+
+          return (
+            <article
+              key={workflow.id}
+              className={`record-row ${isSelectedWorkflow ? "active" : ""}`}
+            >
+              <button type="button" className="record-main" onClick={() => onSelect(workflow)}>
+                <span className="record-title">{workflow.name}</span>
+                <span>{workflow.workflow.steps.length} steps</span>
+                <span>{workflow.updatedAt}</span>
+              </button>
+              <span className="record-footer">
+                <StatusBadge
+                  status={workflow.hasPublishedVersion ? "published" : "draft"}
+                  label={workflow.hasPublishedVersion ? "Published" : "Draft"}
+                />
+                {isCurrent ? <span>Current</span> : null}
+              </span>
+            </article>
+          );
+        })}
       </div>
     </div>
   );
