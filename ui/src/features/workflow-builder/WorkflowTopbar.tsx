@@ -26,10 +26,29 @@ export function WorkflowTopbar({
           aria-label="Workflow name"
         />
       </div>
-      <div className="topbar-status" role={draftView.validation.kind === "error" ? "alert" : "status"}>
+      <div
+        className="topbar-status"
+        role={draftView.validation.kind === "error" || draftView.saveErrorMessage ? "alert" : "status"}
+      >
         <StatusBadge
-          status={draftView.isDirty ? "draft" : "saved"}
-          label={draftView.isDirty ? "Draft changes" : "Draft saved"}
+          status={
+            draftView.saveErrorMessage
+              ? "error"
+              : draftView.isSavingDraft
+                ? "running"
+                : draftView.isDirty
+                  ? "draft"
+                  : "saved"
+          }
+          label={
+            draftView.saveErrorMessage
+              ? "Save failed"
+              : draftView.isSavingDraft
+                ? "Saving draft"
+                : draftView.isDirty
+                  ? "Draft changes"
+                  : "Draft saved"
+          }
         />
         <StatusBadge
           status={draftView.validation.kind}
@@ -37,9 +56,15 @@ export function WorkflowTopbar({
         />
       </div>
       <div className="topbar-actions">
-        <button type="button" className="toolbar-button" onClick={draftView.saveDraft}>
+        <button
+          type="button"
+          className="toolbar-button"
+          onClick={() => void draftView.saveDraft()}
+          disabled={draftView.isSavingDraft}
+          title={draftView.saveErrorMessage}
+        >
           <Icon name="save" />
-          Save Draft
+          {draftView.isSavingDraft ? "Saving" : "Save Draft"}
         </button>
         <button
           type="button"
