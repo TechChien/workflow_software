@@ -12,9 +12,11 @@ export function WorkflowTopbar({
 }: {
   canRun: boolean;
   draftView: DraftViewModel;
-  onPublish: () => void;
+  onPublish: () => void | Promise<void>;
   onRun: () => void;
 }) {
+  const statusMessage = draftView.publishErrorMessage ?? draftView.saveErrorMessage;
+
   return (
     <header className="topbar">
       <div className="topbar-title">
@@ -28,12 +30,14 @@ export function WorkflowTopbar({
       </div>
       <div
         className="topbar-status"
-        role={draftView.validation.kind === "error" || draftView.saveErrorMessage ? "alert" : "status"}
+        role={draftView.validation.kind === "error" || statusMessage ? "alert" : "status"}
       >
         <StatusBadge
           status={
-            draftView.saveErrorMessage
+            statusMessage
               ? "error"
+              : draftView.isPublishingDraft
+                ? "running"
               : draftView.isSavingDraft
                 ? "running"
                 : draftView.isDirty
@@ -41,8 +45,12 @@ export function WorkflowTopbar({
                   : "saved"
           }
           label={
-            draftView.saveErrorMessage
-              ? "Save failed"
+            statusMessage
+              ? draftView.publishErrorMessage
+                ? "Publish failed"
+                : "Save failed"
+              : draftView.isPublishingDraft
+                ? "Publishing draft"
               : draftView.isSavingDraft
                 ? "Saving draft"
                 : draftView.isDirty
@@ -60,7 +68,7 @@ export function WorkflowTopbar({
           type="button"
           className="toolbar-button"
           onClick={() => void draftView.saveDraft()}
-          disabled={draftView.isSavingDraft}
+          disabled={draftView.isSavingDraft || draftView.isPublishingDraft}
           title={draftView.saveErrorMessage}
         >
           <Icon name="save" />
@@ -69,11 +77,16 @@ export function WorkflowTopbar({
         <button
           type="button"
           className="toolbar-button publish-button"
-          onClick={onPublish}
-          disabled={draftView.validation.kind === "error"}
+          onClick={() => void onPublish()}
+          disabled={
+            draftView.validation.kind === "error" ||
+            draftView.isSavingDraft ||
+            draftView.isPublishingDraft
+          }
+          title={draftView.publishErrorMessage}
         >
           <Icon name="upload" />
-          Publish
+          {draftView.isPublishingDraft ? "Publishing" : "Publish"}
         </button>
         <button
           type="button"

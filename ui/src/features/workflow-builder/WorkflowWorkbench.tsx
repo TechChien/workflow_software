@@ -57,9 +57,8 @@ function WorkflowWorkbenchInner() {
   const runHistoryView = useRunHistoryView();
   const canRun = publishedView.workflows.length > 0;
 
-  const handlePublish = () => {
-    const revision = Math.max(0, ...publishedView.workflows.map((workflow) => workflow.revision)) + 1;
-    const published = draftView.createPublishedWorkflow(revision);
+  const handlePublish = async () => {
+    const published = await draftView.publishDraft();
     publishedView.addPublishedWorkflow(published);
     setLeftTab("published");
     setViewMode("published");

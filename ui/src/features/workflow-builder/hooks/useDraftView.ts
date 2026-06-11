@@ -11,14 +11,19 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { stringifyWorkflowYaml, type StepDefinition, type WorkflowYaml } from "@workflow-software/shared";
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type RefObject } from "react";
-import type { WorkflowSummary } from "@/lib/api/api-contract";
+import type { WorkflowDraft, WorkflowSummary, WorkflowVersion } from "@/lib/api/api-contract";
 import { workerApiQueryKeys } from "@/lib/api/query-keys";
 import { componentTemplates, type ComponentTemplate } from "../ComponentLibrary";
 import {
   initialNodePositions,
   type PublishedWorkflow
 } from "@/mock/workflowWorkbench";
-import { useCreateWorkflow, useUpdateWorkflowDraft, useWorkflows } from "@/services/worker-api-service";
+import {
+  useCreateWorkflow,
+  usePublishWorkflowDraft,
+  useUpdateWorkflowDraft,
+  useWorkflows
+} from "@/services/worker-api-service";
 import {
   createEdgesFromSteps,
   createNode,
@@ -58,12 +63,14 @@ export type DraftViewModel = {
   validation: ReturnType<typeof validateDraft>;
   isDirty: boolean;
   isSavingDraft: boolean;
+  isPublishingDraft: boolean;
   saveErrorMessage?: string;
+  publishErrorMessage?: string;
   addWorkflow: () => void;
   renameWorkflow: (name: string) => void;
-  saveDraft: () => void;
+  saveDraft: () => Promise<WorkflowDraft>;
+  publishDraft: () => Promise<PublishedWorkflow>;
   selectWorkflow: (workflow: DraftWorkflowRecord) => void;
-  createPublishedWorkflow: (revision: number) => PublishedWorkflow;
   loadWorkflowVersion: (workflow: PublishedWorkflow) => void;
   addStepFromTemplate: (template: ComponentTemplate, position?: { x: number; y: number }) => void;
   handleDrop: (event: DragEvent<HTMLDivElement>) => void;
@@ -85,6 +92,7 @@ export function useDraftView(): DraftViewModel {
   const workflowsQuery = useWorkflows();
   const createWorkflowMutation = useCreateWorkflow();
   const updateWorkflowDraftMutation = useUpdateWorkflowDraft();
+  const publishWorkflowDraftMutation = usePublishWorkflowDraft();
   const [draftWorkflowId, setDraftWorkflowId] = useState("untitled-workflow");
   const [draftWorkflowName, setDraftWorkflowName] = useState("Untitled Workflow");
   const [draftSteps, setDraftSteps] = useState<StepDefinition[]>([]);
@@ -114,8 +122,10 @@ export function useDraftView(): DraftViewModel {
     [apiDraftWorkflows, localDraftWorkflows]
   );
   const isSavingDraft = createWorkflowMutation.isPending || updateWorkflowDraftMutation.isPending;
+  const isPublishingDraft = publishWorkflowDraftMutation.isPending;
   const saveErrorMessage =
     updateWorkflowDraftMutation.error?.message ?? createWorkflowMutation.error?.message;
+  const publishErrorMessage = publishWorkflowDraftMutation.error?.message;
 
   useEffect(() => {
     setLocalDraftWorkflows((workflows) => {
@@ -336,6 +346,31 @@ export function useDraftView(): DraftViewModel {
     setIsDirty(true);
   }, [draftWorkflowId, persistedWorkflowId]);
 
+  const applySavedWorkflow = useCallback(
+    async (savedWorkflow: WorkflowDraft) => {
+      setIsDirty(false);
+      setPersistedWorkflowId(savedWorkflow.id);
+      setSelectedDraftWorkflowId(savedWorkflow.id);
+      setDraftWorkflowId(savedWorkflow.draftYaml.id);
+      setDraftWorkflowName(savedWorkflow.draftYaml.name);
+      setDraftSteps(savedWorkflow.draftYaml.steps);
+      setDraftNodes(createNodes(savedWorkflow.draftYaml.steps, initialNodePositions));
+      setDraftEdges(createEdgesFromSteps(savedWorkflow.draftYaml.steps));
+      setSelectedDraftStepId(savedWorkflow.draftYaml.steps[0]?.id ?? "");
+      setLocalDraftUpdatedAt(savedWorkflow.updatedAt);
+      setLocalDraftWorkflows((workflows) =>
+        workflows.filter(
+          (workflow) =>
+            workflow.id !== draftWorkflow.id &&
+            workflow.id !== savedWorkflow.id &&
+            workflow.workflow.id !== savedWorkflow.draftYaml.id
+        )
+      );
+      await queryClient.invalidateQueries({ queryKey: workerApiQueryKeys.workflows.all });
+    },
+    [draftWorkflow.id, queryClient, setDraftEdges, setDraftNodes]
+  );
+
   const saveDraft = useCallback(async () => {
     const body = { draftYaml: draftWorkflow };
     const savedWorkflow = persistedWorkflowId
@@ -345,49 +380,26 @@ export function useDraftView(): DraftViewModel {
         })
       : await createWorkflowMutation.mutateAsync(body);
 
-    setIsDirty(false);
-    setPersistedWorkflowId(savedWorkflow.id);
-    setSelectedDraftWorkflowId(savedWorkflow.id);
-    setDraftWorkflowId(savedWorkflow.draftYaml.id);
-    setDraftWorkflowName(savedWorkflow.draftYaml.name);
-    setDraftSteps(savedWorkflow.draftYaml.steps);
-    setDraftNodes(createNodes(savedWorkflow.draftYaml.steps, initialNodePositions));
-    setDraftEdges(createEdgesFromSteps(savedWorkflow.draftYaml.steps));
-    setSelectedDraftStepId(savedWorkflow.draftYaml.steps[0]?.id ?? "");
-    setLocalDraftUpdatedAt(savedWorkflow.updatedAt);
-    setLocalDraftWorkflows((workflows) =>
-      workflows.filter(
-        (workflow) =>
-          workflow.id !== draftWorkflow.id &&
-          workflow.id !== savedWorkflow.id &&
-          workflow.workflow.id !== savedWorkflow.draftYaml.id
-      )
-    );
-    await queryClient.invalidateQueries({ queryKey: workerApiQueryKeys.workflows.all });
+    await applySavedWorkflow(savedWorkflow);
     setViewMode("draft");
+    return savedWorkflow;
   }, [
+    applySavedWorkflow,
     createWorkflowMutation,
     draftWorkflow,
     persistedWorkflowId,
-    queryClient,
-    setDraftEdges,
-    setDraftNodes,
     setViewMode,
     updateWorkflowDraftMutation
   ]);
 
-  const createPublishedWorkflow = useCallback(
-    (revision: number): PublishedWorkflow => {
-      setIsDirty(false);
-      return {
-        id: `version-${draftWorkflow.id}-r${revision}`,
-        revision,
-        publishedAt: formatDateTime(new Date()),
-        workflow: draftWorkflow,
-        lastRunStatus: "pending"
-      };
+  const publishDraft = useCallback(
+    async () => {
+      const savedWorkflow = await saveDraft();
+      const publishedWorkflow = await publishWorkflowDraftMutation.mutateAsync(savedWorkflow.id);
+      await queryClient.invalidateQueries({ queryKey: workerApiQueryKeys.workflows.all });
+      return toPublishedWorkflow(publishedWorkflow);
     },
-    [draftWorkflow]
+    [publishWorkflowDraftMutation, queryClient, saveDraft]
   );
 
   const loadWorkflowVersion = useCallback(
@@ -441,12 +453,14 @@ export function useDraftView(): DraftViewModel {
     validation,
     isDirty,
     isSavingDraft,
+    isPublishingDraft,
     saveErrorMessage,
+    publishErrorMessage,
     addWorkflow,
     renameWorkflow,
     saveDraft,
+    publishDraft,
     selectWorkflow: loadDraftWorkflow,
-    createPublishedWorkflow,
     loadWorkflowVersion,
     addStepFromTemplate,
     handleDrop,
@@ -467,5 +481,15 @@ function toDraftWorkflow(workflow: WorkflowSummary): DraftWorkflowRecord {
     updatedAt: workflow.updatedAt,
     hasPublishedVersion: Boolean(workflow.latestPublishedVersion),
     isLocal: false
+  };
+}
+
+function toPublishedWorkflow(workflowVersion: WorkflowVersion): PublishedWorkflow {
+  return {
+    id: workflowVersion.id,
+    revision: workflowVersion.revision,
+    publishedAt: workflowVersion.publishedAt,
+    workflow: workflowVersion.yamlSnapshot,
+    lastRunStatus: workflowVersion.lastRun?.status ?? "pending"
   };
 }
