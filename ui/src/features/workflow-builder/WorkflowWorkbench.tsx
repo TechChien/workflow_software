@@ -7,7 +7,7 @@ import {
   ReactFlow,
   ReactFlowProvider
 } from "@xyflow/react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { type PublishedWorkflow } from "@/mock/workflowWorkbench";
 import { ComponentLibrary, componentTemplates } from "./ComponentLibrary";
 import { DraftInspector } from "./DraftInspector";
@@ -252,22 +252,32 @@ function MiddleCanvasSection({
       : viewMode === "run"
         ? runHistoryView.selectedRun?.workflow.steps ?? []
         : draftView.steps;
-  const canvasEdges =
-    viewMode === "draft"
-      ? draftView.edges
-      : createEdgesFromSteps(canvasSteps).map((edge) => ({
-          ...edge,
-          className: "workflow-edge-readonly"
-        }));
-  const canvasNodes =
-    viewMode === "draft"
-      ? draftView.nodes
-      : createNodes(
-          canvasSteps,
-          {},
-          viewMode === "run" ? statusByStepId(runHistoryView.selectedRun?.stepRuns ?? []) : undefined,
-          true
-        );
+  const readonlyGraph = useMemo(() => {
+    const stepStatuses =
+      viewMode === "run" ? statusByStepId(runHistoryView.selectedRun?.stepRuns ?? []) : undefined;
+
+    return {
+      edges: createEdgesFromSteps(canvasSteps).map((edge) => ({
+        ...edge,
+        className: "workflow-edge-readonly"
+      })),
+      nodes: createNodes(canvasSteps, {}, stepStatuses, true)
+    };
+  }, [canvasSteps, runHistoryView.selectedRun?.stepRuns, viewMode]);
+  const canvasEdges = viewMode === "draft" ? draftView.edges : readonlyGraph.edges;
+  const canvasNodes = viewMode === "draft" ? draftView.nodes : readonlyGraph.nodes;
+  const canvasKey =
+    viewMode === "published"
+      ? `published-${publishedView.selectedWorkflow?.id ?? "none"}`
+      : viewMode === "run"
+        ? `run-${runHistoryView.selectedRun?.id ?? "none"}`
+        : "draft";
+  const emptyCanvasMessage =
+    viewMode === "published"
+      ? "The selected published workflow has no steps."
+      : viewMode === "run"
+        ? "The selected run has no workflow steps."
+        : "Add a component to start a workflow draft.";
 
   return (
     <section
@@ -309,10 +319,11 @@ function MiddleCanvasSection({
       </div>
       {canvasSteps.length === 0 ? (
         <div className="canvas-empty" role="status">
-          Add a component to start a workflow draft.
+          {emptyCanvasMessage}
         </div>
       ) : (
         <ReactFlow
+          key={canvasKey}
           nodes={canvasNodes}
           edges={canvasEdges}
           onNodesChange={viewMode === "draft" ? draftView.handleNodesChange : undefined}
