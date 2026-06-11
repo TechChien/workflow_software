@@ -7,20 +7,23 @@ import {
   ReactFlow,
   ReactFlowProvider
 } from "@xyflow/react";
-import { type StepDefinition } from "@workflow-software/shared";
 import { useState } from "react";
 import { componentTemplates, type PublishedWorkflow } from "@/mock/workflowWorkbench";
 import { ComponentLibrary } from "./ComponentLibrary";
 import { DraftInspector } from "./DraftInspector";
-import { DraftView, type DraftViewModel } from "./DraftView";
+import { useDraftView, type DraftViewModel } from "./hooks/useDraftView";
+import {
+  usePublishedWorkflowsView,
+  type PublishedWorkflowsViewModel
+} from "./hooks/usePublishedWorkflowsView";
+import { useRunHistoryView, type RunHistoryViewModel } from "./hooks/useRunHistoryView";
 import { Icon } from "./Icon";
 import { PublishedInspector } from "./PublishedInspector";
 import { PublishedList } from "./PublishedList";
-import { PublishedWorkflowsView, type PublishedWorkflowsViewModel } from "./PublishedWorkflowsView";
 import { RunHistoryList } from "./RunHistoryList";
-import { RunHistoryView, type RunHistoryViewModel } from "./RunHistoryView";
 import { RunInspector } from "./RunInspector";
 import { RunTimeline } from "./RunTimeline";
+import { useWorkbenchStore } from "./stores/useWorkbenchStore";
 import { TabButton } from "./TabButton";
 import { WorkflowTopbar } from "./WorkflowTopbar";
 import {
@@ -30,8 +33,6 @@ import {
   statusByStepId,
   StatusBadge,
   viewModeLabel,
-  type CanvasEdge,
-  type CanvasNode,
   type LeftTab,
   type WorkbenchView
 } from "./workbenchShared";
@@ -45,128 +46,87 @@ export function WorkflowWorkbench() {
 }
 
 function WorkflowWorkbenchInner() {
-  const [leftTab, setLeftTab] = useState<LeftTab>("components");
-  const [viewMode, setViewMode] = useState<WorkbenchView>("draft");
+  const leftTab = useWorkbenchStore((state) => state.leftTab);
+  const viewMode = useWorkbenchStore((state) => state.viewMode);
+  const setLeftTab = useWorkbenchStore((state) => state.setLeftTab);
+  const setViewMode = useWorkbenchStore((state) => state.setViewMode);
   const [isLeftCollapsed, setIsLeftCollapsed] = useState(false);
+  const draftView = useDraftView();
+  const publishedView = usePublishedWorkflowsView();
+  const runHistoryView = useRunHistoryView();
+  const canRun = publishedView.workflows.length > 0;
+
+  const handlePublish = () => {
+    const revision = Math.max(0, ...publishedView.workflows.map((workflow) => workflow.revision)) + 1;
+    const published = draftView.createPublishedWorkflow(revision);
+    publishedView.addPublishedWorkflow(published);
+    setLeftTab("published");
+    setViewMode("published");
+  };
+
+  const handleRun = (workflow = publishedView.selectedWorkflow) => {
+    if (!workflow) {
+      return;
+    }
+
+    const run = createRunRecord(workflow);
+    runHistoryView.addRun(run);
+    publishedView.updateLastRunStatus(workflow.id, run.status);
+    setLeftTab("history");
+    setViewMode("run");
+  };
 
   return (
-    <DraftView setLeftTab={setLeftTab} setViewMode={setViewMode}>
-      {(draftView) => (
-        <PublishedWorkflowsView setViewMode={setViewMode}>
-          {(publishedView) => (
-            <RunHistoryView setViewMode={setViewMode} setLeftTab={setLeftTab}>
-              {(runHistoryView) => {
-                const selectedRunStep = runHistoryView.selectedRun?.workflow.steps.find(
-                  (step) => step.id === runHistoryView.selectedStepRun?.stepId
-                );
+    <main className={`app-shell ${viewMode === "run" ? "" : "timeline-collapsed"}`}>
+      <a className="skip-link" href="#workflow-canvas">
+        Skip to canvas
+      </a>
+      <WorkflowTopbar
+        canRun={canRun}
+        draftView={draftView}
+        onPublish={handlePublish}
+        onRun={() => handleRun()}
+      />
 
-                const canvasSteps =
-                  viewMode === "published"
-                    ? publishedView.selectedWorkflow?.workflow.steps ?? []
-                    : viewMode === "run"
-                      ? runHistoryView.selectedRun?.workflow.steps ?? []
-                      : draftView.steps;
-                const canvasEdges =
-                  viewMode === "draft"
-                    ? draftView.edges
-                    : createEdgesFromSteps(canvasSteps).map((edge) => ({
-                        ...edge,
-                        className: "workflow-edge-readonly"
-                      }));
-                const canvasNodes =
-                  viewMode === "draft"
-                    ? draftView.nodes
-                    : createNodes(
-                        canvasSteps,
-                        {},
-                        viewMode === "run"
-                          ? statusByStepId(runHistoryView.selectedRun?.stepRuns ?? [])
-                          : undefined,
-                        true
-                      );
-                const canRun = publishedView.workflows.length > 0;
+      <section className={`workbench-body ${isLeftCollapsed ? "left-collapsed" : ""}`}>
+        <LeftWorkbenchSection
+          activeTab={leftTab}
+          draftView={draftView}
+          isCollapsed={isLeftCollapsed}
+          onCollapse={() => setIsLeftCollapsed(true)}
+          onExpand={() => setIsLeftCollapsed(false)}
+          onRun={handleRun}
+          onSelectTab={setLeftTab}
+          publishedView={publishedView}
+          runHistoryView={runHistoryView}
+        />
 
-                const handlePublish = () => {
-                  const revision = Math.max(0, ...publishedView.workflows.map((workflow) => workflow.revision)) + 1;
-                  const published = draftView.createPublishedWorkflow(revision);
-                  publishedView.addPublishedWorkflow(published);
-                  setLeftTab("published");
-                  setViewMode("published");
-                };
+        <MiddleCanvasSection
+          draftView={draftView}
+          publishedView={publishedView}
+          runHistoryView={runHistoryView}
+          viewMode={viewMode}
+        />
 
-                const handleRun = (workflow = publishedView.selectedWorkflow) => {
-                  if (!workflow) {
-                    return;
-                  }
+        <RightInspectorSection
+          draftView={draftView}
+          onRun={handleRun}
+          publishedView={publishedView}
+          runHistoryView={runHistoryView}
+          viewMode={viewMode}
+        />
+      </section>
 
-                  const run = createRunRecord(workflow);
-                  runHistoryView.addRun(run);
-                  publishedView.updateLastRunStatus(workflow.id, run.status);
-                  setLeftTab("history");
-                  setViewMode("run");
-                };
-
-                return (
-                  <main className={`app-shell ${viewMode === "run" ? "" : "timeline-collapsed"}`}>
-                    <a className="skip-link" href="#workflow-canvas">
-                      Skip to canvas
-                    </a>
-                    <WorkflowTopbar
-                      canRun={canRun}
-                      draftView={draftView}
-                      onPublish={handlePublish}
-                      onRun={() => handleRun()}
-                    />
-
-                    <section className={`workbench-body ${isLeftCollapsed ? "left-collapsed" : ""}`}>
-                      <LeftWorkbenchSection
-                        activeTab={leftTab}
-                        draftView={draftView}
-                        isCollapsed={isLeftCollapsed}
-                        onCollapse={() => setIsLeftCollapsed(true)}
-                        onExpand={() => setIsLeftCollapsed(false)}
-                        onRun={handleRun}
-                        onSelectTab={setLeftTab}
-                        publishedView={publishedView}
-                        runHistoryView={runHistoryView}
-                      />
-
-                      <MiddleCanvasSection
-                        canvasEdges={canvasEdges}
-                        canvasNodes={canvasNodes}
-                        canvasSteps={canvasSteps}
-                        draftView={draftView}
-                        runHistoryView={runHistoryView}
-                        viewMode={viewMode}
-                      />
-
-                      <RightInspectorSection
-                        draftView={draftView}
-                        onRun={handleRun}
-                        publishedView={publishedView}
-                        runHistoryView={runHistoryView}
-                        selectedRunStep={selectedRunStep}
-                        viewMode={viewMode}
-                      />
-                    </section>
-
-                    <RunTimeline
-                      run={viewMode === "run" ? runHistoryView.selectedRun : undefined}
-                      selectedStepRunId={runHistoryView.selectedStepRunId}
-                      onSelectStepRun={runHistoryView.selectStepRun}
-                      onOpenHistory={() => {
-                        setLeftTab("history");
-                        setViewMode("run");
-                      }}
-                    />
-                  </main>
-                );
-              }}
-            </RunHistoryView>
-          )}
-        </PublishedWorkflowsView>
-      )}
-    </DraftView>
+      <RunTimeline
+        run={viewMode === "run" ? runHistoryView.selectedRun : undefined}
+        selectedStepRunId={runHistoryView.selectedStepRunId}
+        onSelectStepRun={runHistoryView.selectStepRun}
+        onOpenHistory={() => {
+          setLeftTab("history");
+          setViewMode("run");
+        }}
+      />
+    </main>
   );
 }
 
@@ -259,20 +219,39 @@ function LeftWorkbenchSection({
 }
 
 function MiddleCanvasSection({
-  canvasEdges,
-  canvasNodes,
-  canvasSteps,
   draftView,
+  publishedView,
   runHistoryView,
   viewMode
 }: {
-  canvasEdges: CanvasEdge[];
-  canvasNodes: CanvasNode[];
-  canvasSteps: StepDefinition[];
   draftView: DraftViewModel;
+  publishedView: PublishedWorkflowsViewModel;
   runHistoryView: RunHistoryViewModel;
   viewMode: WorkbenchView;
 }) {
+  const canvasSteps =
+    viewMode === "published"
+      ? publishedView.selectedWorkflow?.workflow.steps ?? []
+      : viewMode === "run"
+        ? runHistoryView.selectedRun?.workflow.steps ?? []
+        : draftView.steps;
+  const canvasEdges =
+    viewMode === "draft"
+      ? draftView.edges
+      : createEdgesFromSteps(canvasSteps).map((edge) => ({
+          ...edge,
+          className: "workflow-edge-readonly"
+        }));
+  const canvasNodes =
+    viewMode === "draft"
+      ? draftView.nodes
+      : createNodes(
+          canvasSteps,
+          {},
+          viewMode === "run" ? statusByStepId(runHistoryView.selectedRun?.stepRuns ?? []) : undefined,
+          true
+        );
+
   return (
     <section
       id="workflow-canvas"
@@ -336,16 +315,18 @@ function RightInspectorSection({
   onRun,
   publishedView,
   runHistoryView,
-  selectedRunStep,
   viewMode
 }: {
   draftView: DraftViewModel;
   onRun: (workflow?: PublishedWorkflow) => void;
   publishedView: PublishedWorkflowsViewModel;
   runHistoryView: RunHistoryViewModel;
-  selectedRunStep?: StepDefinition;
   viewMode: WorkbenchView;
 }) {
+  const selectedRunStep = runHistoryView.selectedRun?.workflow.steps.find(
+    (step) => step.id === runHistoryView.selectedStepRun?.stepId
+  );
+
   return (
     <aside className="workbench-right inspector-panel" aria-label="Metadata inspector">
       {viewMode === "draft" ? (

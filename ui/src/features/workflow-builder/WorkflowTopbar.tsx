@@ -1,6 +1,6 @@
 "use client";
 
-import { type DraftViewModel } from "./DraftView";
+import { type DraftViewModel } from "./hooks/useDraftView";
 import { Icon } from "./Icon";
 import { StatusBadge } from "./workbenchShared";
 

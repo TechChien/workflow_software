@@ -1,12 +1,10 @@
-"use client";
-
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, useState } from "react";
 import {
   initialRuns,
   type RunRecord,
   type StepRunRecord
 } from "@/mock/workflowWorkbench";
-import { type LeftTab, type WorkbenchView } from "./workbenchShared";
+import { useWorkbenchStore } from "../stores/useWorkbenchStore";
 
 export type RunHistoryViewModel = {
   runs: RunRecord[];
@@ -19,15 +17,9 @@ export type RunHistoryViewModel = {
   selectStepRun: (stepRunId: string) => void;
 };
 
-export function RunHistoryView({
-  children,
-  setLeftTab,
-  setViewMode
-}: {
-  children: (view: RunHistoryViewModel) => ReactNode;
-  setLeftTab: (tab: LeftTab) => void;
-  setViewMode: (viewMode: WorkbenchView) => void;
-}) {
+export function useRunHistoryView(): RunHistoryViewModel {
+  const setLeftTab = useWorkbenchStore((state) => state.setLeftTab);
+  const setViewMode = useWorkbenchStore((state) => state.setViewMode);
   const [runHistory, setRunHistory] = useState<RunRecord[]>(initialRuns);
   const [selectedRunId, setSelectedRunId] = useState(initialRuns[0]?.id ?? "");
   const [selectedStepRunId, setSelectedStepRunId] = useState(initialRuns[0]?.stepRuns[1]?.id ?? "");
@@ -41,19 +33,24 @@ export function RunHistoryView({
     setSelectedStepRunId(run.stepRuns[0]?.id ?? "");
   }, []);
 
-  return children({
+  const selectRun = useCallback(
+    (run: RunRecord) => {
+      setSelectedRunId(run.id);
+      setSelectedStepRunId(run.stepRuns[0]?.id ?? "");
+      setLeftTab("history");
+      setViewMode("run");
+    },
+    [setLeftTab, setViewMode]
+  );
+
+  return {
     runs: runHistory,
     selectedRunId,
     selectedStepRunId,
     selectedRun,
     selectedStepRun,
     addRun,
-    selectRun: (run) => {
-      setSelectedRunId(run.id);
-      setSelectedStepRunId(run.stepRuns[0]?.id ?? "");
-      setLeftTab("history");
-      setViewMode("run");
-    },
+    selectRun,
     selectStepRun: setSelectedStepRunId
-  });
+  };
 }

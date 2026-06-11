@@ -1,5 +1,3 @@
-"use client";
-
 import {
   addEdge,
   MarkerType,
@@ -11,7 +9,7 @@ import {
   type NodeChange
 } from "@xyflow/react";
 import { stringifyWorkflowYaml, type StepDefinition } from "@workflow-software/shared";
-import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useRef, useState, type DragEvent, type RefObject } from "react";
 import {
   componentTemplates,
   initialNodePositions,
@@ -30,13 +28,12 @@ import {
   stepsWithConnections,
   validateDraft,
   type CanvasEdge,
-  type CanvasNode,
-  type LeftTab,
-  type WorkbenchView
-} from "./workbenchShared";
+  type CanvasNode
+} from "../workbenchShared";
+import { useWorkbenchStore } from "../stores/useWorkbenchStore";
 
 export type DraftViewModel = {
-  flowWrapperRef: React.RefObject<HTMLDivElement | null>;
+  flowWrapperRef: RefObject<HTMLDivElement | null>;
   workflowName: string;
   steps: StepDefinition[];
   nodes: CanvasNode[];
@@ -50,7 +47,7 @@ export type DraftViewModel = {
   createPublishedWorkflow: (revision: number) => PublishedWorkflow;
   loadWorkflowVersion: (workflow: PublishedWorkflow) => void;
   addStepFromTemplate: (template: ComponentTemplate, position?: { x: number; y: number }) => void;
-  handleDrop: (event: React.DragEvent<HTMLDivElement>) => void;
+  handleDrop: (event: DragEvent<HTMLDivElement>) => void;
   handleNodesChange: (changes: NodeChange<CanvasNode>[]) => void;
   handleEdgesChange: (changes: EdgeChange<CanvasEdge>[]) => void;
   handleConnect: (connection: Connection) => void;
@@ -58,16 +55,10 @@ export type DraftViewModel = {
   updateSelectedStep: (updater: (step: StepDefinition) => StepDefinition) => void;
 };
 
-export function DraftView({
-  children,
-  setLeftTab,
-  setViewMode
-}: {
-  children: (view: DraftViewModel) => ReactNode;
-  setLeftTab: (tab: LeftTab) => void;
-  setViewMode: (viewMode: WorkbenchView) => void;
-}) {
-  const flowWrapperRef = useRef<HTMLDivElement>(null);
+export function useDraftView(): DraftViewModel {
+  const setLeftTab = useWorkbenchStore((state) => state.setLeftTab);
+  const setViewMode = useWorkbenchStore((state) => state.setViewMode);
+  const flowWrapperRef = useRef<HTMLDivElement | null>(null);
   const { screenToFlowPosition } = useReactFlow();
   const [draftWorkflowId, setDraftWorkflowId] = useState("requirement-analysis-flow");
   const [draftWorkflowName, setDraftWorkflowName] = useState("Requirement Analysis Flow");
@@ -143,7 +134,7 @@ export function DraftView({
   );
 
   const handleDrop = useCallback(
-    (event: React.DragEvent<HTMLDivElement>) => {
+    (event: DragEvent<HTMLDivElement>) => {
       event.preventDefault();
       const templateId = event.dataTransfer.getData("application/workflow-step");
       const template = componentTemplates.find((item) => item.id === templateId);
@@ -183,6 +174,11 @@ export function DraftView({
     [setDraftEdges]
   );
 
+  const renameWorkflow = useCallback((name: string) => {
+    setDraftWorkflowName(name);
+    setIsDirty(true);
+  }, []);
+
   const saveDraft = useCallback(() => {
     setIsDirty(false);
     setViewMode("draft");
@@ -217,7 +213,7 @@ export function DraftView({
     [setDraftEdges, setDraftNodes, setLeftTab, setViewMode]
   );
 
-  return children({
+  return {
     flowWrapperRef,
     workflowName: draftWorkflowName,
     steps: draftSteps,
@@ -227,10 +223,7 @@ export function DraftView({
     yaml: draftYaml,
     validation,
     isDirty,
-    renameWorkflow: (name: string) => {
-      setDraftWorkflowName(name);
-      setIsDirty(true);
-    },
+    renameWorkflow,
     saveDraft,
     createPublishedWorkflow,
     loadWorkflowVersion,
@@ -241,5 +234,5 @@ export function DraftView({
     handleConnect,
     selectStep: setSelectedDraftStepId,
     updateSelectedStep
-  });
+  };
 }

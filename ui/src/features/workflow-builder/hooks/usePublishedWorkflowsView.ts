@@ -1,12 +1,10 @@
-"use client";
-
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, useState } from "react";
 import {
   initialPublished,
   type PublishedWorkflow,
   type WorkflowRunStatus
 } from "@/mock/workflowWorkbench";
-import { type WorkbenchView } from "./workbenchShared";
+import { useWorkbenchStore } from "../stores/useWorkbenchStore";
 
 export type PublishedWorkflowsViewModel = {
   workflows: PublishedWorkflow[];
@@ -17,13 +15,8 @@ export type PublishedWorkflowsViewModel = {
   selectWorkflow: (workflow: PublishedWorkflow) => void;
 };
 
-export function PublishedWorkflowsView({
-  children,
-  setViewMode
-}: {
-  children: (view: PublishedWorkflowsViewModel) => ReactNode;
-  setViewMode: (viewMode: WorkbenchView) => void;
-}) {
+export function usePublishedWorkflowsView(): PublishedWorkflowsViewModel {
+  const setViewMode = useWorkbenchStore((state) => state.setViewMode);
   const [publishedWorkflows, setPublishedWorkflows] = useState<PublishedWorkflow[]>(initialPublished);
   const [selectedPublishedWorkflowVersionId, setSelectedPublishedWorkflowVersionId] = useState(
     initialPublished[0]?.id ?? ""
@@ -43,15 +36,20 @@ export function PublishedWorkflowsView({
     );
   }, []);
 
-  return children({
+  const selectWorkflow = useCallback(
+    (workflow: PublishedWorkflow) => {
+      setSelectedPublishedWorkflowVersionId(workflow.id);
+      setViewMode("published");
+    },
+    [setViewMode]
+  );
+
+  return {
     workflows: publishedWorkflows,
     selectedWorkflowId: selectedPublishedWorkflowVersionId,
     selectedWorkflow: selectedPublishedWorkflow,
     addPublishedWorkflow,
     updateLastRunStatus,
-    selectWorkflow: (workflow) => {
-      setSelectedPublishedWorkflowVersionId(workflow.id);
-      setViewMode("published");
-    }
-  });
+    selectWorkflow
+  };
 }

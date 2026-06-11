@@ -159,7 +159,7 @@ paths:
       tags: [Workflows]
       operationId: listWorkflows
       summary: List workflow drafts for the builder sidebar.
-      x-implementation-status: implemented_response_should_expand
+      x-implementation-status: implemented
       parameters:
         - $ref: "#/components/parameters/Limit"
         - $ref: "#/components/parameters/Cursor"
@@ -200,7 +200,7 @@ paths:
       tags: [Workflows]
       operationId: getWorkflow
       summary: Get one workflow draft with publish and run summary data.
-      x-implementation-status: required_missing
+      x-implementation-status: implemented
       parameters:
         - $ref: "#/components/parameters/WorkflowId"
       responses:
@@ -248,7 +248,7 @@ paths:
       tags: [Workflow Versions]
       operationId: listWorkflowVersions
       summary: List published immutable versions for one workflow.
-      x-implementation-status: required_missing
+      x-implementation-status: implemented
       parameters:
         - $ref: "#/components/parameters/WorkflowId"
         - $ref: "#/components/parameters/Limit"
@@ -293,7 +293,7 @@ paths:
       tags: [Workflow Versions]
       operationId: getWorkflowVersion
       summary: Get one published workflow snapshot.
-      x-implementation-status: required_missing
+      x-implementation-status: implemented
       parameters:
         - $ref: "#/components/parameters/WorkflowVersionId"
       responses:
@@ -313,7 +313,7 @@ paths:
       tags: [Runs]
       operationId: listWorkflowRuns
       summary: List workflow runs for the history panel.
-      x-implementation-status: required_missing
+      x-implementation-status: implemented
       parameters:
         - name: workflowId
           in: query
@@ -377,7 +377,7 @@ paths:
       tags: [Runs]
       operationId: getWorkflowRun
       summary: Get run detail for status, timeline, inspectors, decisions, and artifacts.
-      x-implementation-status: implemented_response_should_expand
+      x-implementation-status: implemented
       parameters:
         - $ref: "#/components/parameters/RunId"
       responses:
@@ -397,7 +397,7 @@ paths:
       tags: [Runs]
       operationId: listRunEvents
       summary: Poll lightweight run events for live UI updates.
-      x-implementation-status: required_missing
+      x-implementation-status: implemented
       parameters:
         - $ref: "#/components/parameters/RunId"
         - name: after
@@ -431,7 +431,7 @@ paths:
       tags: [Step Runs]
       operationId: rerunStep
       summary: Request a rerun of one step after rejection, revision, or stale state.
-      x-implementation-status: required_missing
+      x-implementation-status: implemented
       parameters:
         - $ref: "#/components/parameters/StepRunId"
       requestBody:
@@ -459,7 +459,7 @@ paths:
       tags: [Human Decisions]
       operationId: createHumanDecision
       summary: Persist a human review decision for a waiting step.
-      x-implementation-status: implemented_stub_should_persist
+      x-implementation-status: implemented
       parameters:
         - $ref: "#/components/parameters/StepRunId"
       requestBody:
@@ -519,7 +519,7 @@ paths:
       tags: [Artifacts]
       operationId: getArtifactVersion
       summary: Get artifact metadata and optional text content.
-      x-implementation-status: implemented_stub_should_expand
+      x-implementation-status: implemented
       parameters:
         - $ref: "#/components/parameters/ArtifactVersionId"
         - name: includeContent
