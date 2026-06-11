@@ -1,6 +1,7 @@
 "use client";
 
 import { type StepDefinition } from "@workflow-software/shared";
+import { useEffect, useRef, useState } from "react";
 import { lines, parseContextPaths, StatusBadge } from "./workbenchShared";
 
 export function DraftInspector({
@@ -12,6 +13,23 @@ export function DraftInspector({
   yaml: string;
   onStepChange: (updater: (step: StepDefinition) => StepDefinition) => void;
 }) {
+  const externalCriteriaText = step?.acceptance.criteria.join("\n") ?? "";
+  const [criteriaText, setCriteriaText] = useState(externalCriteriaText);
+  const [isEditingCriteria, setIsEditingCriteria] = useState(false);
+  const previousStepId = useRef(step?.id);
+
+  useEffect(() => {
+    if (previousStepId.current !== step?.id) {
+      previousStepId.current = step?.id;
+      setCriteriaText(externalCriteriaText);
+      return;
+    }
+
+    if (!isEditingCriteria && criteriaText !== externalCriteriaText) {
+      setCriteriaText(externalCriteriaText);
+    }
+  }, [criteriaText, externalCriteriaText, isEditingCriteria, step?.id]);
+
   if (!step) {
     return (
       <div className="inspector-empty" role="status">
@@ -130,13 +148,21 @@ export function DraftInspector({
       <label className="field">
         <span>Acceptance criteria</span>
         <textarea
-          value={step.acceptance.criteria.join("\n")}
-          onChange={(event) =>
+          value={criteriaText}
+          onBlur={() => {
+            setIsEditingCriteria(false);
+            setCriteriaText(lines(criteriaText).join("\n"));
+          }}
+          onChange={(event) => {
+            const nextCriteriaText = event.target.value;
+
+            setCriteriaText(nextCriteriaText);
             onStepChange((current) => ({
               ...current,
-              acceptance: { criteria: lines(event.target.value) }
-            }))
-          }
+              acceptance: { criteria: lines(nextCriteriaText) }
+            }));
+          }}
+          onFocus={() => setIsEditingCriteria(true)}
         />
       </label>
 
