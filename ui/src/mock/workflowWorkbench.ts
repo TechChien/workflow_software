@@ -16,14 +16,7 @@ export type StepRunStatus =
 
 export type WorkflowRunStatus = "pending" | "running" | "waiting" | "completed" | "failed" | "cancelled";
 
-export type ComponentTemplate = {
-  id: string;
-  idPrefix: string;
-  name: string;
-  purpose: string;
-  meta: string;
-  defaults: Omit<StepDefinition, "id" | "upstream" | "downstream">;
-};
+
 
 export type PublishedWorkflow = {
   id: string;
@@ -118,80 +111,7 @@ export const sampleSteps: StepDefinition[] = [
   }
 ];
 
-export const componentTemplates: ComponentTemplate[] = [
-  {
-    id: "agent-step",
-    idPrefix: "agent_step",
-    name: "Agent Step",
-    purpose: "General Codex reasoning step that writes text artifacts.",
-    meta: "agent / mixed evaluator",
-    defaults: {
-      name: "Agent Step",
-      type: "agent",
-      input_artifacts: [],
-      output_artifacts: [{ artifact: "agent_output", filename: "agent-output.md", format: "markdown" }],
-      context_paths: [],
-      tool_capabilities: ["*"],
-      evaluate: { evaluator: "mixed" },
-      prompt: "Describe the task this agent should complete.",
-      acceptance: { criteria: ["Output matches the requested scope."] }
-    }
-  },
-  {
-    id: "code-agent-step",
-    idPrefix: "code_agent_step",
-    name: "Code Agent Step",
-    purpose: "Code-aware step that can inspect workspace context.",
-    meta: "code_agent / human review",
-    defaults: {
-      name: "Code Agent Step",
-      type: "code_agent",
-      input_artifacts: [],
-      output_artifacts: [{ artifact: "code_change_summary", filename: "change-summary.md", format: "markdown" }],
-      context_paths: [{ path: "src", type: "directory", optional: true }],
-      tool_capabilities: ["*"],
-      evaluate: { evaluator: "human_review" },
-      prompt: "Inspect the workspace context and produce the requested code change summary.",
-      acceptance: { criteria: ["Every codebase claim cites file evidence."] }
-    }
-  },
-  {
-    id: "human-review-gate",
-    idPrefix: "human_review_gate",
-    name: "Human Review Gate",
-    purpose: "Pause the workflow for approval or steering feedback.",
-    meta: "agent / human_review evaluator",
-    defaults: {
-      name: "Human Review Gate",
-      type: "agent",
-      input_artifacts: [],
-      output_artifacts: [{ artifact: "review_decision", filename: "review-decision.md", format: "markdown" }],
-      context_paths: [],
-      tool_capabilities: ["*"],
-      evaluate: { evaluator: "human_review" },
-      prompt: "Summarize the decision needed from the reviewer.",
-      acceptance: { criteria: ["The decision request is clear and actionable."] }
-    }
-  },
-  {
-    id: "artifact-output",
-    idPrefix: "artifact_output",
-    name: "Artifact Output",
-    purpose: "Produce a named formal artifact for downstream steps.",
-    meta: "agent / declared output",
-    defaults: {
-      name: "Artifact Output",
-      type: "agent",
-      input_artifacts: [],
-      output_artifacts: [{ artifact: "formal_artifact", filename: "artifact.md", format: "markdown" }],
-      context_paths: [],
-      tool_capabilities: ["*"],
-      evaluate: { evaluator: "mixed" },
-      prompt: "Create the formal artifact exactly as declared.",
-      acceptance: { criteria: ["The declared artifact file is complete."] }
-    }
-  }
-];
+
 
 export const initialNodePositions: Record<string, { x: number; y: number }> = {
   g1_intent_freeze: { x: 80, y: 120 },

@@ -1,6 +1,55 @@
 "use client";
 
-import { type ComponentTemplate } from "@/mock/workflowWorkbench";
+import type { StepDefinition } from "@workflow-software/shared";
+
+export type ComponentTemplate = {
+  id: string;
+  idPrefix: string;
+  name: string;
+  purpose: string;
+  meta: string;
+  defaults: Omit<StepDefinition, "id" | "upstream" | "downstream">;
+};
+
+export const componentTemplates: ComponentTemplate[] = [
+  {
+    id: "agent-step",
+    idPrefix: "agent_step",
+    name: "Agent Step",
+    purpose: "General Codex reasoning step that writes text artifacts.",
+    meta: "agent / mixed evaluator",
+    defaults: {
+      name: "Agent Step",
+      type: "agent",
+      input_artifacts: [],
+      output_artifacts: [{ artifact: "agent_output", filename: "agent-output.md", format: "markdown" }],
+      context_paths: [],
+      tool_capabilities: ["*"],
+      evaluate: { evaluator: "mixed" },
+      prompt: "Describe the task this agent should complete.",
+      acceptance: { criteria: ["Output matches the requested scope."] }
+    }
+  },
+  {
+    id: "code-agent-step",
+    idPrefix: "code_agent_step",
+    name: "Code Agent Step",
+    purpose: "Code-aware step that can inspect workspace context.",
+    meta: "code_agent / human review",
+    defaults: {
+      name: "Code Agent Step",
+      type: "code_agent",
+      input_artifacts: [],
+      output_artifacts: [{ artifact: "code_change_summary", filename: "change-summary.md", format: "markdown" }],
+      context_paths: [{ path: "src", type: "directory", optional: true }],
+      tool_capabilities: ["*"],
+      evaluate: { evaluator: "human_review" },
+      prompt: "Inspect the workspace context and produce the requested code change summary.",
+      acceptance: { criteria: ["Every codebase claim cites file evidence."] }
+    }
+  }
+];
+
 
 export function ComponentLibrary({
   templates,
@@ -42,3 +91,5 @@ export function ComponentLibrary({
     </div>
   );
 }
+
+

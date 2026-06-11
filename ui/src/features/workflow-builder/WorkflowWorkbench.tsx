@@ -8,8 +8,8 @@ import {
   ReactFlowProvider
 } from "@xyflow/react";
 import { useState } from "react";
-import { componentTemplates, type PublishedWorkflow } from "@/mock/workflowWorkbench";
-import { ComponentLibrary } from "./ComponentLibrary";
+import { type PublishedWorkflow } from "@/mock/workflowWorkbench";
+import { ComponentLibrary, componentTemplates } from "./ComponentLibrary";
 import { DraftInspector } from "./DraftInspector";
 import { useDraftView, type DraftViewModel } from "./hooks/useDraftView";
 import {
