@@ -229,6 +229,8 @@ button.primary:hover:not(:disabled) {
 .inspector-panel {
   overflow: auto;
   border-left: 1px solid var(--line);
+  position: relative;
+  z-index: 30;
 }
 
 .workbench-left,
@@ -648,6 +650,10 @@ button.primary:hover:not(:disabled) {
   gap: 6px;
 }
 
+.field {
+  position: relative;
+}
+
 .field-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -658,6 +664,66 @@ button.primary:hover:not(:disabled) {
   font-weight: 800;
 }
 
+.field-label {
+  z-index: 1;
+  display: inline-flex;
+  width: max-content;
+  max-width: 100%;
+  align-items: center;
+  gap: 6px;
+}
+
+.field-help {
+  z-index: 2;
+  display: inline-grid;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  place-items: center;
+  color: var(--muted);
+  cursor: help;
+}
+
+.field-help .button-icon {
+  width: 15px;
+  height: 15px;
+}
+
+.field-help:hover {
+  z-index: 40;
+  color: var(--teal-strong);
+}
+
+.field-help:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--teal), white 18%);
+  outline-offset: 3px;
+}
+
+.field-tip {
+  position: absolute;
+  top: 24px;
+  left: 0;
+  z-index: 100;
+  display: none;
+  width: min(300px, 100%);
+  border: 1px solid color-mix(in srgb, var(--teal), white 72%);
+  border-radius: var(--radius);
+  background: #f0fdfa;
+  color: var(--muted-strong);
+  padding: 9px 10px;
+  box-shadow: var(--shadow);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.45;
+  white-space: pre-line;
+}
+
+.field-help:hover .field-tip,
+.field-help:focus .field-tip,
+.field-help:focus-visible .field-tip {
+  display: block;
+}
+
 .field input,
 .field select,
 .field textarea {
@@ -665,6 +731,18 @@ button.primary:hover:not(:disabled) {
   background: var(--surface-alt);
   color: var(--ink);
   padding: 8px;
+}
+
+.field textarea[aria-invalid="true"] {
+  border-color: var(--amber);
+  background: #fffbeb;
+}
+
+.field-warning {
+  color: var(--amber);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
 }
 
 .field textarea {
