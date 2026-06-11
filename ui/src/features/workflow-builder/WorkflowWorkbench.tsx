@@ -271,7 +271,24 @@ function MiddleCanvasSection({
           <strong>{viewModeLabel(viewMode)}</strong>
           <span>{canvasSteps.length} steps / {canvasEdges.length} links</span>
         </div>
-        {viewMode !== "draft" ? <StatusBadge status="readonly" label="Read only snapshot" /> : null}
+        {viewMode === "draft" ? (
+          <button
+            type="button"
+            className="icon-button"
+            onClick={() => {
+              if (draftView.selectedStep) {
+                draftView.deleteStep(draftView.selectedStep.id);
+              }
+            }}
+            disabled={!draftView.selectedStep}
+            aria-label="Delete selected node"
+            title="Delete selected node"
+          >
+            <Icon name="trash" />
+          </button>
+        ) : (
+          <StatusBadge status="readonly" label="Read only snapshot" />
+        )}
       </div>
       {canvasSteps.length === 0 ? (
         <div className="canvas-empty" role="status">

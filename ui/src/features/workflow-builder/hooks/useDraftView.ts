@@ -52,6 +52,7 @@ export type DraftViewModel = {
   handleEdgesChange: (changes: EdgeChange<CanvasEdge>[]) => void;
   handleConnect: (connection: Connection) => void;
   selectStep: (stepId: string) => void;
+  deleteStep: (stepId: string) => void;
   updateSelectedStep: (updater: (step: StepDefinition) => StepDefinition) => void;
 };
 
@@ -83,12 +84,46 @@ export function useDraftView(): DraftViewModel {
 
   const markDirty = useCallback(() => setIsDirty(true), []);
 
+  const deleteSteps = useCallback(
+    (stepIds: string[]) => {
+      const idsToDelete = new Set(stepIds);
+      const remainingSteps = draftSteps.filter((step) => !idsToDelete.has(step.id));
+
+      if (remainingSteps.length === draftSteps.length) {
+        return;
+      }
+
+      setDraftSteps(remainingSteps);
+      setDraftNodes((nodes) => nodes.filter((node) => !idsToDelete.has(node.id)));
+      setDraftEdges((edges) =>
+        edges.filter((edge) => !idsToDelete.has(edge.source) && !idsToDelete.has(edge.target))
+      );
+      if (idsToDelete.has(selectedDraftStepId)) {
+        setSelectedDraftStepId(remainingSteps[0]?.id ?? "");
+      }
+      markDirty();
+    },
+    [draftSteps, markDirty, selectedDraftStepId, setDraftEdges, setDraftNodes]
+  );
+
+  const deleteStep = useCallback((stepId: string) => deleteSteps([stepId]), [deleteSteps]);
+
   const handleNodesChange = useCallback(
     (changes: NodeChange<CanvasNode>[]) => {
+      const removedNodeIds = changes
+        .filter((change) => change.type === "remove")
+        .map((change) => change.id);
+      const retainedChanges = changes.filter((change) => change.type !== "remove");
+
       markDirty();
-      onDraftNodesChange(changes);
+      if (retainedChanges.length) {
+        onDraftNodesChange(retainedChanges);
+      }
+      if (removedNodeIds.length) {
+        deleteSteps(removedNodeIds);
+      }
     },
-    [markDirty, onDraftNodesChange]
+    [deleteSteps, markDirty, onDraftNodesChange]
   );
 
   const handleEdgesChange = useCallback(
@@ -233,6 +268,7 @@ export function useDraftView(): DraftViewModel {
     handleEdgesChange,
     handleConnect,
     selectStep: setSelectedDraftStepId,
+    deleteStep,
     updateSelectedStep
   };
 }
