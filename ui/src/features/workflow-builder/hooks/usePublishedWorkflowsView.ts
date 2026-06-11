@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { WorkflowSummary } from "@/lib/api/api-contract";
+import type { WorkflowVersion } from "@/lib/api/api-contract";
 import {
   type PublishedWorkflow,
   type WorkflowRunStatus
 } from "@/mock/workflowWorkbench";
-import { useWorkflows } from "@/services/worker-api-service";
+import { useWorkflowVersionsForWorkflows, useWorkflows } from "@/services/worker-api-service";
 import { useWorkbenchStore } from "../stores/useWorkbenchStore";
 
 export type PublishedWorkflowsViewModel = {
@@ -21,14 +21,19 @@ export type PublishedWorkflowsViewModel = {
 export function usePublishedWorkflowsView(): PublishedWorkflowsViewModel {
   const setViewMode = useWorkbenchStore((state) => state.setViewMode);
   const workflowsQuery = useWorkflows();
+  const workflowIds = useMemo(
+    () => workflowsQuery.data?.items.map((workflow) => workflow.id) ?? [],
+    [workflowsQuery.data?.items]
+  );
+  const workflowVersionsQueries = useWorkflowVersionsForWorkflows(workflowIds);
   const [localPublishedWorkflows, setLocalPublishedWorkflows] = useState<PublishedWorkflow[]>([]);
   const [lastRunStatusOverrides, setLastRunStatusOverrides] = useState<Record<string, WorkflowRunStatus>>({});
   const apiPublishedWorkflows = useMemo(
     () =>
-      workflowsQuery.data?.items
-        .map(toPublishedWorkflow)
-        .filter((workflow): workflow is PublishedWorkflow => Boolean(workflow)) ?? [],
-    [workflowsQuery.data?.items]
+      workflowVersionsQueries
+        .flatMap((query) => query.data?.items ?? [])
+        .map(toPublishedWorkflow),
+    [workflowVersionsQueries]
   );
   const publishedWorkflows = useMemo(() => {
     const localWorkflowIds = new Set(localPublishedWorkflows.map((workflow) => workflow.id));
@@ -77,24 +82,22 @@ export function usePublishedWorkflowsView(): PublishedWorkflowsViewModel {
     workflows: publishedWorkflows,
     selectedWorkflowId: selectedPublishedWorkflowVersionId,
     selectedWorkflow: selectedPublishedWorkflow,
-    isLoading: workflowsQuery.isLoading,
-    errorMessage: workflowsQuery.error?.message,
+    isLoading: workflowsQuery.isLoading || workflowVersionsQueries.some((query) => query.isLoading),
+    errorMessage:
+      workflowsQuery.error?.message ??
+      workflowVersionsQueries.find((query) => query.error)?.error?.message,
     addPublishedWorkflow,
     updateLastRunStatus,
     selectWorkflow
   };
 }
 
-function toPublishedWorkflow(workflow: WorkflowSummary): PublishedWorkflow | undefined {
-  if (!workflow.latestPublishedVersion) {
-    return undefined;
-  }
-
+function toPublishedWorkflow(workflowVersion: WorkflowVersion): PublishedWorkflow {
   return {
-    id: workflow.latestPublishedVersion.id,
-    revision: workflow.latestPublishedVersion.revision,
-    publishedAt: workflow.latestPublishedVersion.publishedAt,
-    workflow: workflow.draftYaml,
-    lastRunStatus: workflow.latestPublishedVersion.lastRun?.status ?? workflow.lastRun?.status ?? "pending"
+    id: workflowVersion.id,
+    revision: workflowVersion.revision,
+    publishedAt: workflowVersion.publishedAt,
+    workflow: workflowVersion.yamlSnapshot,
+    lastRunStatus: workflowVersion.lastRun?.status ?? "pending"
   };
 }

@@ -2,6 +2,7 @@
 
 import {
   useMutation,
+  useQueries,
   useQuery,
   type UseMutationOptions,
   type UseQueryOptions
@@ -76,16 +77,17 @@ export function useWorkflow(
   });
 }
 
-export function useWorkflowVersions(
-  workflowId?: string,
-  params?: PaginationParams,
-  options?: QueryOptions<WorkflowVersionListResponse>
+
+export function useWorkflowVersionsForWorkflows(
+  workflowIds: string[],
+  params?: PaginationParams
 ) {
-  return useQuery({
-    ...options,
-    enabled: Boolean(workflowId) && (options?.enabled ?? true),
-    queryKey: workerApiQueryKeys.workflows.versions(workflowId ?? "", params),
-    queryFn: () => workerApiClient.listWorkflowVersions(workflowId ?? "", params)
+  return useQueries({
+    queries: workflowIds.map((workflowId) => ({
+      queryKey: workerApiQueryKeys.workflows.versions(workflowId, params),
+      queryFn: () => workerApiClient.listWorkflowVersions(workflowId, params),
+      enabled: Boolean(workflowId)
+    }))
   });
 }
 
