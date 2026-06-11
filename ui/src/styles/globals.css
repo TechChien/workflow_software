@@ -331,8 +331,42 @@ button.primary:hover:not(:disabled) {
   padding: 14px;
 }
 
+.draft-panel {
+  display: grid;
+  height: 100%;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.draft-list-section {
+  min-height: 0;
+  overflow: auto;
+}
+
+.draft-component-library {
+  border-top: 1px solid var(--line);
+  background: var(--surface-alt);
+}
+
+.draft-component-library .template-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .section-heading {
   margin-bottom: 10px;
+}
+
+.draft-add-button {
+  min-height: 30px;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
+.draft-count {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .section-heading h2 {
@@ -399,6 +433,16 @@ button.primary:hover:not(:disabled) {
 .record-main span {
   color: var(--muted);
   font-size: 12px;
+}
+
+.empty-state {
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 12px;
 }
 
 .template-meta button,

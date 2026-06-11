@@ -4,13 +4,14 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Play,
+  Plus,
   Save,
   Trash2,
   Upload,
   type LucideIcon
 } from "lucide-react";
 
-export type IconName = "save" | "upload" | "play" | "panel" | "collapse" | "trash";
+export type IconName = "save" | "upload" | "play" | "panel" | "collapse" | "trash" | "plus";
 
 const icons: Record<IconName, LucideIcon> = {
   save: Save,
@@ -18,7 +19,8 @@ const icons: Record<IconName, LucideIcon> = {
   play: Play,
   panel: PanelLeftOpen,
   collapse: PanelLeftClose,
-  trash: Trash2
+  trash: Trash2,
+  plus: Plus
 };
 
 export function Icon({ name }: { name: IconName }) {

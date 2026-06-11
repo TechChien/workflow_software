@@ -10,7 +10,7 @@ import {
 } from "@/mock/workflowWorkbench";
 
 export type WorkbenchView = "draft" | "published" | "run";
-export type LeftTab = "components" | "published" | "history";
+export type LeftTab = "draft" | "published" | "history";
 
 export type CanvasNodeData = Record<string, unknown> & {
   label: ReactNode;

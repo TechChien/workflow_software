@@ -9,7 +9,7 @@ type WorkbenchState = {
 };
 
 export const useWorkbenchStore = create<WorkbenchState>((set) => ({
-  leftTab: "components",
+  leftTab: "draft",
   viewMode: "draft",
   setLeftTab: (leftTab) => set({ leftTab }),
   setViewMode: (viewMode) => set({ viewMode })

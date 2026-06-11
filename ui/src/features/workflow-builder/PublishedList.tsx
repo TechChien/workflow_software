@@ -4,11 +4,15 @@ import { type PublishedWorkflow } from "@/mock/workflowWorkbench";
 import { StatusBadge } from "./workbenchShared";
 
 export function PublishedList({
+  errorMessage,
+  isLoading,
   workflows,
   selectedId,
   onSelect,
   onRun
 }: {
+  errorMessage?: string;
+  isLoading: boolean;
   workflows: PublishedWorkflow[];
   selectedId: string;
   onSelect: (workflow: PublishedWorkflow) => void;
@@ -20,6 +24,21 @@ export function PublishedList({
         <h2>Published Workflows</h2>
         <span>{workflows.length} versions</span>
       </div>
+      {isLoading ? (
+        <div className="empty-state" role="status">
+          Loading published workflows...
+        </div>
+      ) : null}
+      {errorMessage ? (
+        <div className="empty-state" role="alert">
+          {errorMessage}
+        </div>
+      ) : null}
+      {!isLoading && !errorMessage && workflows.length === 0 ? (
+        <div className="empty-state" role="status">
+          No published workflows yet.
+        </div>
+      ) : null}
       <div className="record-list">
         {workflows.map((workflow) => (
           <article

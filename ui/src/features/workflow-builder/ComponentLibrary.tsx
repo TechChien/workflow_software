@@ -22,12 +22,12 @@ export const componentTemplates: ComponentTemplate[] = [
       name: "Agent Step",
       type: "agent",
       input_artifacts: [],
-      output_artifacts: [{ artifact: "agent_output", filename: "agent-output.md", format: "markdown" }],
+      output_artifacts: [],
       context_paths: [],
       tool_capabilities: ["*"],
       evaluate: { evaluator: "mixed" },
       prompt: "Describe the task this agent should complete.",
-      acceptance: { criteria: ["Output matches the requested scope."] }
+      acceptance: { criteria: [] }
     }
   },
   {
@@ -35,17 +35,17 @@ export const componentTemplates: ComponentTemplate[] = [
     idPrefix: "code_agent_step",
     name: "Code Agent Step",
     purpose: "Code-aware step that can inspect workspace context.",
-    meta: "code_agent / human review",
+    meta: "code_agent / mixed evaluator",
     defaults: {
       name: "Code Agent Step",
       type: "code_agent",
       input_artifacts: [],
-      output_artifacts: [{ artifact: "code_change_summary", filename: "change-summary.md", format: "markdown" }],
-      context_paths: [{ path: "src", type: "directory", optional: true }],
+      output_artifacts: [],
+      context_paths: [],
       tool_capabilities: ["*"],
-      evaluate: { evaluator: "human_review" },
+      evaluate: { evaluator: "mixed" },
       prompt: "Inspect the workspace context and produce the requested code change summary.",
-      acceptance: { criteria: ["Every codebase claim cites file evidence."] }
+      acceptance: { criteria: [] }
     }
   }
 ];
@@ -53,13 +53,15 @@ export const componentTemplates: ComponentTemplate[] = [
 
 export function ComponentLibrary({
   templates,
-  onAdd
+  onAdd,
+  className
 }: {
   templates: ComponentTemplate[];
   onAdd: (template: ComponentTemplate) => void;
+  className?: string;
 }) {
   return (
-    <div className="panel-section" role="tabpanel">
+    <div className={`panel-section component-library${className ? ` ${className}` : ""}`}>
       <div className="section-heading">
         <h2>Component Library</h2>
         <span>{templates.length} templates</span>
@@ -80,7 +82,7 @@ export function ComponentLibrary({
               <p>{template.purpose}</p>
             </div>
             <div className="template-meta">
-              <span>{template.meta}</span>
+              {/* <span>{template.meta}</span> */}
               <button type="button" onClick={() => onAdd(template)}>
                 Add
               </button>
@@ -91,5 +93,4 @@ export function ComponentLibrary({
     </div>
   );
 }
-
 

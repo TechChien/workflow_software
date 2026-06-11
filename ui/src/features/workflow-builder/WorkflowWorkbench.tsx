@@ -11,6 +11,7 @@ import { useState } from "react";
 import { type PublishedWorkflow } from "@/mock/workflowWorkbench";
 import { ComponentLibrary, componentTemplates } from "./ComponentLibrary";
 import { DraftInspector } from "./DraftInspector";
+import { DraftList } from "./DraftList";
 import { useDraftView, type DraftViewModel } from "./hooks/useDraftView";
 import {
   usePublishedWorkflowsView,
@@ -180,8 +181,8 @@ function LeftWorkbenchSection({
               </button>
             </div>
             <div className="tab-list" role="tablist" aria-label="Resource tabs">
-              <TabButton active={activeTab === "components"} onClick={() => onSelectTab("components")}>
-                Components
+              <TabButton active={activeTab === "draft"} onClick={() => onSelectTab("draft")}>
+                Draft
               </TabButton>
               <TabButton active={activeTab === "published"} onClick={() => onSelectTab("published")}>
                 Published
@@ -193,11 +194,27 @@ function LeftWorkbenchSection({
           </div>
 
           <div className="left-panel-content">
-            {activeTab === "components" ? (
-              <ComponentLibrary templates={componentTemplates} onAdd={draftView.addStepFromTemplate} />
+            {activeTab === "draft" ? (
+              <div className="draft-panel" role="tabpanel">
+                <DraftList
+                  errorMessage={draftView.errorMessage}
+                  isLoading={draftView.isLoading}
+                  workflows={draftView.workflows}
+                  selectedId={draftView.selectedWorkflowId}
+                  onAddWorkflow={draftView.addWorkflow}
+                  onSelect={draftView.selectWorkflow}
+                />
+                <ComponentLibrary
+                  className="draft-component-library"
+                  templates={componentTemplates}
+                  onAdd={draftView.addStepFromTemplate}
+                />
+              </div>
             ) : null}
             {activeTab === "published" ? (
               <PublishedList
+                errorMessage={publishedView.errorMessage}
+                isLoading={publishedView.isLoading}
                 workflows={publishedView.workflows}
                 selectedId={publishedView.selectedWorkflowId}
                 onSelect={publishedView.selectWorkflow}
