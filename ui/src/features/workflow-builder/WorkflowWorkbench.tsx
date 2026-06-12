@@ -223,6 +223,8 @@ function LeftWorkbenchSection({
             ) : null}
             {activeTab === "history" ? (
               <RunHistoryList
+                errorMessage={runHistoryView.errorMessage}
+                isLoading={runHistoryView.isLoading}
                 runs={runHistoryView.runs}
                 selectedId={runHistoryView.selectedRunId}
                 onSelect={runHistoryView.selectRun}

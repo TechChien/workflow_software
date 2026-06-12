@@ -19,6 +19,10 @@ const artifactVersionOrder = [
   { version: "asc" as const },
   { id: "asc" as const }
 ];
+const artifactInputOrder = [
+  { artifactKey: "asc" as const },
+  { id: "asc" as const }
+];
 const createdOrder = [{ createdAt: "asc" as const }, { id: "asc" as const }];
 
 export const workflowRunDetailInclude = {
@@ -27,7 +31,7 @@ export const workflowRunDetailInclude = {
     orderBy: stepRunOrder,
     include: {
       artifactInputs: {
-        orderBy: createdOrder,
+        orderBy: artifactInputOrder,
         include: {
           artifactVersion: {
             include: {
@@ -100,7 +104,7 @@ export const stepRunDetailInclude = {
     }
   },
   artifactInputs: {
-    orderBy: createdOrder,
+    orderBy: artifactInputOrder,
     include: {
       artifactVersion: {
         include: {

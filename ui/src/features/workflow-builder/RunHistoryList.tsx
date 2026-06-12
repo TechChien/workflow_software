@@ -4,10 +4,14 @@ import { type RunRecord } from "@/mock/workflowWorkbench";
 import { StatusBadge } from "./workbenchShared";
 
 export function RunHistoryList({
+  errorMessage,
+  isLoading,
   runs,
   selectedId,
   onSelect
 }: {
+  errorMessage?: string;
+  isLoading: boolean;
   runs: RunRecord[];
   selectedId: string;
   onSelect: (run: RunRecord) => void;
@@ -16,8 +20,23 @@ export function RunHistoryList({
     <div className="panel-section" role="tabpanel">
       <div className="section-heading">
         <h2>Run History</h2>
-        <span>{runs.length} runs</span>
+        <span>{isLoading ? "Loading" : `${runs.length} runs`}</span>
       </div>
+      {errorMessage ? (
+        <p className="empty-state" role="alert">
+          Unable to load run history: {errorMessage}
+        </p>
+      ) : null}
+      {!errorMessage && isLoading ? (
+        <p className="empty-state" role="status">
+          Loading run history...
+        </p>
+      ) : null}
+      {!errorMessage && !isLoading && !runs.length ? (
+        <p className="empty-state" role="status">
+          No workflow runs yet.
+        </p>
+      ) : null}
       <div className="record-list">
         {runs.map((run) => (
           <button
