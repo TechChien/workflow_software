@@ -8,7 +8,7 @@ export type ComponentTemplate = {
   name: string;
   purpose: string;
   meta: string;
-  defaults: Omit<StepDefinition, "id" | "upstream" | "downstream">;
+  defaults: Omit<StepDefinition, "id" | "depends_on">;
 };
 
 export const componentTemplates: ComponentTemplate[] = [
@@ -93,4 +93,3 @@ export function ComponentLibrary({
     </div>
   );
 }
-

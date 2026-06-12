@@ -79,7 +79,7 @@ async function createTwoStepWorkflowRun(client: DbClient) {
       {
         id: firstStepId,
         type: "code_agent",
-        downstream: secondStepId,
+        depends_on: [],
         input_artifacts: [],
         output_artifacts: [],
         context_paths: [],
@@ -91,7 +91,7 @@ async function createTwoStepWorkflowRun(client: DbClient) {
       {
         id: secondStepId,
         type: "code_agent",
-        upstream: firstStepId,
+        depends_on: [firstStepId],
         input_artifacts: [],
         output_artifacts: [],
         context_paths: [],
@@ -168,7 +168,7 @@ async function createTwoStepArtifactWorkflowRun(
       {
         id: firstStepId,
         type: "code_agent",
-        downstream: secondStepId,
+        depends_on: [],
         input_artifacts: [],
         output_artifacts: [
           {
@@ -191,7 +191,7 @@ async function createTwoStepArtifactWorkflowRun(
       {
         id: secondStepId,
         type: "code_agent",
-        upstream: firstStepId,
+        depends_on: [firstStepId],
         input_artifacts: [
           {
             artifact: firstArtifactKey,
@@ -293,7 +293,7 @@ async function createPlanExecutionWorkflowRun(
       {
         id: firstStepId,
         type: "code_agent",
-        downstream: secondStepId,
+        depends_on: [],
         input_artifacts: [],
         output_artifacts: [
           {
@@ -323,7 +323,7 @@ async function createPlanExecutionWorkflowRun(
       {
         id: secondStepId,
         type: "code_agent",
-        upstream: firstStepId,
+        depends_on: [firstStepId],
         input_artifacts: [
           {
             artifact: planArtifactKey,

@@ -64,7 +64,7 @@ function createStepRuns(
 ) {
   return definition.steps.map((step) => ({
     stepId: step.id,
-    status: step.upstream ? ("PENDING" as const) : ("READY" as const),
+    status: step.depends_on.length > 0 ? ("PENDING" as const) : ("READY" as const),
     evaluator: resolveStepRunEvaluator(step.evaluate.evaluator),
     codeWorkspaceId,
     requiresCodeReview: step.type === "code_agent"

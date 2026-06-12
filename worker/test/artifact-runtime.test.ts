@@ -120,6 +120,7 @@ function stepDefinition(step: Partial<StepDefinition>): StepDefinition {
   return {
     id: "step-1",
     type: "code_agent",
+    depends_on: [],
     input_artifacts: [],
     output_artifacts: [],
     context_paths: [],

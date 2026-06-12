@@ -1,0 +1,4 @@
+interface:
+  display_name: "Workflow YAML Creator"
+  short_description: "Create workflow.yaml files from task decompositions."
+  default_prompt: "Use $workflow-yaml-creator to turn my task decomposition into a workflow.yaml file."

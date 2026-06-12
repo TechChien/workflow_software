@@ -112,25 +112,30 @@ export function hydrateNodes(nodes: CanvasNode[], steps: StepDefinition[]) {
 }
 
 export function createEdgesFromSteps(steps: StepDefinition[]): CanvasEdge[] {
-  return steps
-    .filter((step) => step.downstream)
-    .map((step) => ({
-      id: `${step.id}-${step.downstream}`,
-      source: step.id,
-      target: step.downstream as string,
-      type: "smoothstep",
-      markerEnd: { type: MarkerType.ArrowClosed }
-    }));
+  return steps.flatMap((step) =>
+    step.depends_on
+      .filter((dependencyId) => dependencyId !== step.id)
+      .map((dependencyId) => ({
+        id: `${dependencyId}-${step.id}`,
+        source: dependencyId,
+        target: step.id,
+        type: "smoothstep",
+        markerEnd: { type: MarkerType.ArrowClosed }
+      }))
+  );
 }
 
 export function stepsWithConnections(steps: StepDefinition[], edges: CanvasEdge[]): StepDefinition[] {
   return steps.map((step) => {
-    const incoming = edges.find((edge) => edge.target === step.id);
-    const outgoing = edges.find((edge) => edge.source === step.id);
+    const { upstream: _upstream, downstream: _downstream, ...stepWithoutLegacy } =
+      step as StepDefinition & { upstream?: string; downstream?: string };
+    const incoming = edges.filter((edge) => edge.target === step.id);
+
     return {
-      ...step,
-      upstream: incoming?.source,
-      downstream: outgoing?.target
+      ...stepWithoutLegacy,
+      depends_on: Array.from(
+        new Set(incoming.map((edge) => edge.source).filter((source) => source !== step.id))
+      )
     };
   });
 }
@@ -158,6 +163,7 @@ export function nextStepId(prefix: string, steps: StepDefinition[]) {
 export function validateDraft(steps: StepDefinition[], edges: CanvasEdge[]) {
   const emptyPrompts = steps.filter((step) => !step.prompt.trim()).length;
   const duplicateIds = steps.length - new Set(steps.map((step) => step.id)).size;
+  const selfEdges = edges.filter((edge) => edge.source === edge.target).length;
   const invalidEdges = edges.filter(
     (edge) => !steps.some((step) => step.id === edge.source) || !steps.some((step) => step.id === edge.target)
   ).length;
@@ -166,7 +172,7 @@ export function validateDraft(steps: StepDefinition[], edges: CanvasEdge[]) {
     return { kind: "error", summary: "No steps" };
   }
 
-  if (duplicateIds || invalidEdges) {
+  if (duplicateIds || invalidEdges || selfEdges) {
     return { kind: "error", summary: "Invalid graph" };
   }
 

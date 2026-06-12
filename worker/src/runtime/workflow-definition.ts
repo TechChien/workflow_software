@@ -3,14 +3,14 @@ import {
   WorkflowYamlSchema,
   parseWorkflowYaml,
   stringifyWorkflowYaml,
-  type WorkflowYaml
+  type WorkflowYamlInput
 } from "@workflow-software/shared";
 
 export function hashWorkflowYaml(source: string) {
   return createHash("sha256").update(source).digest("hex");
 }
 
-export function canonicalizeWorkflowDefinition(input: WorkflowYaml) {
+export function canonicalizeWorkflowDefinition(input: WorkflowYamlInput) {
   const definition = WorkflowYamlSchema.parse(input);
   const yaml = stringifyWorkflowYaml(definition);
 

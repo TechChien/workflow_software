@@ -710,6 +710,7 @@ components:
       required:
         - id
         - type
+        - depends_on
         - input_artifacts
         - output_artifacts
         - context_paths
@@ -726,10 +727,12 @@ components:
         type:
           type: string
           enum: [agent, code_agent]
-        upstream:
-          type: string
-        downstream:
-          type: string
+        depends_on:
+          type: array
+          items:
+            type: string
+            minLength: 1
+          default: []
         input_artifacts:
           type: array
           items:

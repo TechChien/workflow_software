@@ -283,6 +283,7 @@ export function useDraftView(): DraftViewModel {
       const id = nextStepId(template.idPrefix, draftSteps);
       const step: StepDefinition = {
         id,
+        depends_on: [],
         ...template.defaults,
         name: template.defaults.name ?? template.name
       };

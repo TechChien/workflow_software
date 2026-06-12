@@ -11,4 +11,5 @@ export * from "./types/codex.js";
 export * from "./types/runtime.js";
 export * from "./types/workflow.js";
 export * from "./utils/artifact-keys.js";
+export * from "./utils/workflow-graph.js";
 export * from "./utils/yaml.js";

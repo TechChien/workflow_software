@@ -1,6 +1,10 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { parseWorkflowYaml } from "@workflow-software/shared";
+import {
+  parseWorkflowYaml,
+  transitiveDependentStepIds,
+  workflowStepIds
+} from "@workflow-software/shared";
 import { resetToCommit } from "../../code-workspace/git-checkpoints.js";
 import { prisma } from "../../db/prisma.js";
 import { Prisma } from "../../generated/prisma/client.js";
@@ -23,33 +27,14 @@ const RerunStepRequestSchema = z.object({
 
 function downstreamStepIds(workflowYaml: string, stepId: string) {
   const workflow = parseWorkflowYaml(workflowYaml);
-  const byId = new Map(workflow.steps.map((step) => [step.id, step]));
-  const start = byId.get(stepId);
 
-  if (!start) {
+  if (!workflowStepIds(workflow).has(stepId)) {
     throw badRequest("StepRun stepId was not found in its workflow snapshot", {
       stepId
     });
   }
 
-  const downstream: string[] = [];
-  const seen = new Set<string>([stepId]);
-  let nextStepId = start.downstream;
-
-  while (nextStepId) {
-    if (seen.has(nextStepId)) {
-      throw badRequest("Workflow snapshot contains a downstream cycle", {
-        stepId,
-        downstreamStepId: nextStepId
-      });
-    }
-
-    seen.add(nextStepId);
-    downstream.push(nextStepId);
-    nextStepId = byId.get(nextStepId)?.downstream;
-  }
-
-  return downstream;
+  return transitiveDependentStepIds(workflow, stepId);
 }
 
 export async function registerStepRunRoutes(app: FastifyInstance) {

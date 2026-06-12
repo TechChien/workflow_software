@@ -68,6 +68,7 @@ function baseStep(overrides: Partial<StepDefinition> = {}): StepDefinition {
   return {
     id: "step-1",
     type: "agent",
+    depends_on: [],
     input_artifacts: [],
     output_artifacts: [],
     context_paths: [],

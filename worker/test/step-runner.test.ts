@@ -122,6 +122,7 @@ class FakeRuntimeDb {
     steps: Array<{
       id: string;
       type: "agent" | "code_agent";
+      dependsOn?: string[];
       upstream?: string;
       downstream?: string;
       evaluator: StepRunEvaluator;
@@ -143,6 +144,7 @@ class FakeRuntimeDb {
       steps: steps.map((step) => ({
         id: step.id,
         type: step.type,
+        depends_on: step.dependsOn ?? [],
         upstream: step.upstream,
         downstream: step.downstream,
         input_artifacts: [],
@@ -166,7 +168,11 @@ class FakeRuntimeDb {
       id: `step-run-${step.id}`,
       workflowRunId: this.workflowRun.id,
       stepId: step.id,
-      status: step.status ?? (step.upstream ? "PENDING" : "READY"),
+      status:
+        step.status ??
+        ((step.dependsOn?.length ?? 0) > 0 || step.upstream
+          ? "PENDING"
+          : "READY"),
       evaluator: step.evaluator,
       codeWorkspaceId: "code-workspace-1",
       codexError: null,
@@ -203,6 +209,25 @@ class FakeRuntimeDb {
             }
           };
         },
+        findMany: async (args: {
+          where?: {
+            workflowRunId?: string;
+          };
+          select?: {
+            stepId?: boolean;
+            status?: boolean;
+          };
+        }) =>
+          this.stepRuns
+            .filter(
+              (stepRun) =>
+                !args.where?.workflowRunId ||
+                stepRun.workflowRunId === args.where.workflowRunId
+            )
+            .map((stepRun) => ({
+              stepId: stepRun.stepId,
+              status: stepRun.status
+            })),
         findUnique: async (args: { where: { id: string } }) => {
           const stepRun = this.requireStepRun(args.where.id);
           return {
@@ -443,13 +468,12 @@ describe("runNextReadyStep", () => {
       {
         id: "step-1",
         type: "agent",
-        downstream: "step-2",
         evaluator: StepRunEvaluator.MIXED
       },
       {
         id: "step-2",
         type: "agent",
-        upstream: "step-1",
+        dependsOn: ["step-1"],
         evaluator: StepRunEvaluator.EVALUATOR_REVIEW
       }
     ]);
@@ -496,6 +520,77 @@ describe("runNextReadyStep", () => {
     ]);
   });
 
+  it("readies every eligible fanout child after a parent is accepted", async () => {
+    const db = new FakeRuntimeDb([
+      {
+        id: "step-1",
+        type: "agent",
+        evaluator: StepRunEvaluator.MIXED
+      },
+      {
+        id: "step-2",
+        type: "agent",
+        dependsOn: ["step-1"],
+        evaluator: StepRunEvaluator.EVALUATOR_REVIEW
+      },
+      {
+        id: "step-3",
+        type: "agent",
+        dependsOn: ["step-1"],
+        evaluator: StepRunEvaluator.EVALUATOR_REVIEW
+      }
+    ]);
+
+    await expect(runNextReadyStep(dependencies(db))).resolves.toMatchObject({
+      picked: true,
+      outcome: "accepted"
+    });
+
+    expect(db.requireStepRun("step-run-step-1").status).toBe("ACCEPTED");
+    expect(db.requireStepRun("step-run-step-2").status).toBe("READY");
+    expect(db.requireStepRun("step-run-step-3").status).toBe("READY");
+    expect(db.workflowRun.status).toBe("RUNNING");
+  });
+
+  it("waits to ready a fanin child until all dependencies are accepted", async () => {
+    const db = new FakeRuntimeDb([
+      {
+        id: "step-1",
+        type: "agent",
+        evaluator: StepRunEvaluator.MIXED
+      },
+      {
+        id: "step-2",
+        type: "agent",
+        evaluator: StepRunEvaluator.MIXED
+      },
+      {
+        id: "step-3",
+        type: "agent",
+        dependsOn: ["step-1", "step-2"],
+        evaluator: StepRunEvaluator.EVALUATOR_REVIEW
+      }
+    ]);
+
+    await expect(runNextReadyStep(dependencies(db))).resolves.toMatchObject({
+      picked: true,
+      outcome: "accepted"
+    });
+
+    expect(db.requireStepRun("step-run-step-1").status).toBe("ACCEPTED");
+    expect(db.requireStepRun("step-run-step-2").status).toBe("READY");
+    expect(db.requireStepRun("step-run-step-3").status).toBe("PENDING");
+
+    await expect(runNextReadyStep(dependencies(db))).resolves.toMatchObject({
+      picked: true,
+      outcome: "accepted"
+    });
+
+    expect(db.requireStepRun("step-run-step-2").status).toBe("ACCEPTED");
+    expect(db.requireStepRun("step-run-step-3").status).toBe("READY");
+    expect(db.workflowRun.status).toBe("RUNNING");
+  });
+
   it("uses the run CodeWorkspace worktree when no working directory override is provided", async () => {
     const db = new FakeRuntimeDb([
       {
@@ -540,13 +635,12 @@ describe("runNextReadyStep", () => {
       {
         id: "step-1",
         type: "code_agent",
-        downstream: "step-2",
         evaluator: StepRunEvaluator.HUMAN_REVIEW
       },
       {
         id: "step-2",
         type: "agent",
-        upstream: "step-1",
+        dependsOn: ["step-1"],
         evaluator: StepRunEvaluator.MIXED
       }
     ]);
@@ -585,7 +679,6 @@ describe("runNextReadyStep", () => {
       {
         id: "step-1",
         type: "agent",
-        downstream: "step-2",
         evaluator: StepRunEvaluator.MIXED,
         outputArtifacts: [
           {
@@ -598,7 +691,7 @@ describe("runNextReadyStep", () => {
       {
         id: "step-2",
         type: "agent",
-        upstream: "step-1",
+        dependsOn: ["step-1"],
         evaluator: StepRunEvaluator.EVALUATOR_REVIEW
       }
     ]);

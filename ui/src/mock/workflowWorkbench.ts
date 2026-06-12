@@ -55,7 +55,7 @@ export const sampleSteps: StepDefinition[] = [
     id: "g1_intent_freeze",
     name: "G1 Intent Freeze",
     type: "agent",
-    downstream: "g2_gap_analysis",
+    depends_on: [],
     input_artifacts: [],
     output_artifacts: [{ artifact: "g1_requirements", filename: "requirements.md", format: "markdown" }],
     context_paths: [],
@@ -70,43 +70,61 @@ export const sampleSteps: StepDefinition[] = [
     }
   },
   {
-    id: "g2_gap_analysis",
-    name: "G2 Gap Analysis",
+    id: "g2_backend_gap",
+    name: "G2 Backend Gap",
     type: "code_agent",
-    upstream: "g1_intent_freeze",
-    downstream: "g3_decision_split",
+    depends_on: ["g1_intent_freeze"],
     input_artifacts: [{ artifact: "g1_requirements", required: true }],
     output_artifacts: [
-      { artifact: "g2_gap_summary", filename: "g2-gap-summary.md", format: "markdown" },
-      { artifact: "g2_evidence_index", filename: "g2-evidence-index.md", format: "markdown" }
+      { artifact: "g2_backend_gap_summary", filename: "backend-gap-summary.md", format: "markdown" }
     ],
-    context_paths: [{ path: "src", type: "directory", optional: true }],
+    context_paths: [{ path: "worker/src", type: "directory", optional: true }],
     tool_capabilities: ["*"],
     evaluate: { evaluator: "human_review" },
-    prompt: "Inspect the accepted artifact inputs and optional worktree-relative context.",
+    prompt: "Inspect backend workflow runtime gaps using the accepted requirements.",
     acceptance: {
       criteria: [
         "Every codebase claim must cite file and line evidence.",
-        "Each identified gap explains its impact."
+        "Each backend gap explains its impact."
       ]
     }
   },
   {
-    id: "g3_decision_split",
-    name: "G3 Decision Split",
-    type: "agent",
-    upstream: "g2_gap_analysis",
-    input_artifacts: [
-      { artifact: "g2_gap_summary", required: true },
-      { artifact: "g2_evidence_index", required: true }
+    id: "g3_ui_gap",
+    name: "G3 UI Gap",
+    type: "code_agent",
+    depends_on: ["g1_intent_freeze"],
+    input_artifacts: [{ artifact: "g1_requirements", required: true }],
+    output_artifacts: [
+      { artifact: "g3_ui_gap_summary", filename: "ui-gap-summary.md", format: "markdown" }
     ],
-    output_artifacts: [{ artifact: "g3_plan", filename: "implementation-plan.md", format: "markdown" }],
+    context_paths: [{ path: "ui/src", type: "directory", optional: true }],
+    tool_capabilities: ["*"],
+    evaluate: { evaluator: "human_review" },
+    prompt: "Inspect workflow builder UI gaps using the accepted requirements.",
+    acceptance: {
+      criteria: [
+        "Every UI claim must cite file and line evidence.",
+        "Each UI gap explains its impact."
+      ]
+    }
+  },
+  {
+    id: "g4_synthesis",
+    name: "G4 Synthesis",
+    type: "agent",
+    depends_on: ["g2_backend_gap", "g3_ui_gap"],
+    input_artifacts: [
+      { artifact: "g2_backend_gap_summary", required: true },
+      { artifact: "g3_ui_gap_summary", required: true }
+    ],
+    output_artifacts: [{ artifact: "g4_plan", filename: "implementation-plan.md", format: "markdown" }],
     context_paths: [],
     tool_capabilities: ["*"],
     evaluate: { evaluator: "mixed" },
-    prompt: "Turn the accepted gap analysis into an implementation-ready plan.",
+    prompt: "Turn the accepted backend and UI gap analyses into an implementation-ready plan.",
     acceptance: {
-      criteria: ["The plan is decision-complete.", "Risks and test scenarios are explicit."]
+      criteria: ["The plan covers both branches.", "Risks and test scenarios are explicit."]
     }
   }
 ];
@@ -115,8 +133,9 @@ export const sampleSteps: StepDefinition[] = [
 
 export const initialNodePositions: Record<string, { x: number; y: number }> = {
   g1_intent_freeze: { x: 80, y: 120 },
-  g2_gap_analysis: { x: 390, y: 120 },
-  g3_decision_split: { x: 700, y: 120 }
+  g2_backend_gap: { x: 390, y: 32 },
+  g3_ui_gap: { x: 390, y: 208 },
+  g4_synthesis: { x: 720, y: 120 }
 };
 
 export const initialPublished: PublishedWorkflow[] = [
@@ -151,23 +170,31 @@ export const initialRuns: RunRecord[] = [
       },
       {
         id: "step-run-g2-r2",
-        stepId: "g2_gap_analysis",
+        stepId: "g2_backend_gap",
         status: "accepted",
         attempt: 2,
         evaluator: "human_review",
         artifacts: [
-          { key: "g2_gap_summary", version: "v2", status: "accepted" },
-          { key: "g2_evidence_index", version: "v2", status: "accepted" }
+          { key: "g2_backend_gap_summary", version: "v2", status: "accepted" }
         ],
         codexUsage: { inputTokens: 8194, outputTokens: 2142 }
       },
       {
         id: "step-run-g3-r2",
-        stepId: "g3_decision_split",
+        stepId: "g3_ui_gap",
+        status: "accepted",
+        attempt: 1,
+        evaluator: "human_review",
+        artifacts: [{ key: "g3_ui_gap_summary", version: "v1", status: "accepted" }],
+        codexUsage: { inputTokens: 6021, outputTokens: 1548 }
+      },
+      {
+        id: "step-run-g4-r2",
+        stepId: "g4_synthesis",
         status: "accepted",
         attempt: 1,
         evaluator: "mixed",
-        artifacts: [{ key: "g3_plan", version: "v1", status: "accepted" }],
+        artifacts: [{ key: "g4_plan", version: "v1", status: "accepted" }],
         codexUsage: { inputTokens: 4440, outputTokens: 1375 }
       }
     ]

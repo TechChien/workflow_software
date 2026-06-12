@@ -8,7 +8,7 @@ steps:
     type: agent
     evaluate:
       evaluator: mixed
-    downstream: g2_gap_analysis
+    depends_on: []
     input_artifacts: []
     output_artifacts:
       - artifact: g1_requirements
@@ -23,27 +23,73 @@ steps:
         - No implementation-layer details.
         - Every requirement is traceable to the original request.
 
-  - id: g2_gap_analysis
+  - id: g2_backend_gap
     type: code_agent
     evaluate:
       evaluator: human_review
-    upstream: g1_intent_freeze
+    depends_on:
+      - g1_intent_freeze
     input_artifacts:
       - artifact: g1_requirements
     output_artifacts:
-      - artifact: g2_gap_summary
-        filename: g2-gap-summary.md
-      - artifact: g2_evidence_index
-        filename: g2-evidence-index.md
+      - artifact: g2_backend_gap_summary
+        filename: backend-gap-summary.md
     context_paths:
-      - path: src
+      - path: worker/src
         type: directory
         optional: true
     tool_capabilities:
       - "*"
     prompt: |
-      Inspect the accepted artifact inputs and optional worktree-relative context.
+      Inspect backend workflow runtime gaps using the accepted requirements.
     acceptance:
       criteria:
         - Every codebase claim must cite file and line evidence.
-        - Each identified gap explains its impact.
+        - Each backend gap explains its impact.
+
+  - id: g3_ui_gap
+    type: code_agent
+    evaluate:
+      evaluator: human_review
+    depends_on:
+      - g1_intent_freeze
+    input_artifacts:
+      - artifact: g1_requirements
+    output_artifacts:
+      - artifact: g3_ui_gap_summary
+        filename: ui-gap-summary.md
+    context_paths:
+      - path: ui/src
+        type: directory
+        optional: true
+    tool_capabilities:
+      - "*"
+    prompt: |
+      Inspect workflow builder UI gaps using the accepted requirements.
+    acceptance:
+      criteria:
+        - Every UI claim must cite file and line evidence.
+        - Each UI gap explains its impact.
+
+  - id: g4_synthesis
+    type: agent
+    evaluate:
+      evaluator: mixed
+    depends_on:
+      - g2_backend_gap
+      - g3_ui_gap
+    input_artifacts:
+      - artifact: g2_backend_gap_summary
+      - artifact: g3_ui_gap_summary
+    output_artifacts:
+      - artifact: g4_plan
+        filename: implementation-plan.md
+    context_paths: []
+    tool_capabilities:
+      - "*"
+    prompt: |
+      Turn the accepted backend and UI gap analyses into an implementation-ready plan.
+    acceptance:
+      criteria:
+        - The plan covers both branches.
+        - Risks and test scenarios are explicit.

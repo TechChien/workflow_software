@@ -1,5 +1,11 @@
 import type { FastifyInstance } from "fastify";
-import { HumanDecisionRequestSchema, parseWorkflowYaml } from "@workflow-software/shared";
+import {
+  directDependentStepIds,
+  HumanDecisionRequestSchema,
+  parseWorkflowYaml,
+  workflowStepIds,
+  type WorkflowYaml
+} from "@workflow-software/shared";
 import { prisma } from "../../db/prisma.js";
 import { badRequest, notFound } from "../errors.js";
 import {
@@ -25,17 +31,54 @@ const DECISION_VERDICT_TO_DB = {
   request_revision: "REQUEST_REVISION"
 } as const;
 
-function downstreamStepId(workflowYaml: string, stepId: string) {
+function workflowForStep(workflowYaml: string, stepId: string) {
   const workflow = parseWorkflowYaml(workflowYaml);
-  const step = workflow.steps.find((candidate) => candidate.id === stepId);
 
-  if (!step) {
+  if (!workflowStepIds(workflow).has(stepId)) {
     throw badRequest("StepRun stepId was not found in its workflow snapshot", {
       stepId
     });
   }
 
-  return step.downstream;
+  return workflow;
+}
+
+function statusByStepId(stepRuns: Array<{ stepId: string; status: string }>) {
+  return new Map(stepRuns.map((stepRun) => [stepRun.stepId, stepRun.status]));
+}
+
+function dependenciesAccepted(
+  workflow: WorkflowYaml,
+  stepId: string,
+  statuses: Map<string, string>
+) {
+  const step = workflow.steps.find((candidate) => candidate.id === stepId);
+
+  return Boolean(
+    step &&
+      step.depends_on.every(
+        (dependencyId) => statuses.get(dependencyId) === "ACCEPTED"
+      )
+  );
+}
+
+function readyEligibleDependentStepIds(
+  workflow: WorkflowYaml,
+  completedStepId: string,
+  statuses: Map<string, string>
+) {
+  return directDependentStepIds(workflow, completedStepId).filter(
+    (dependentStepId) =>
+      statuses.get(dependentStepId) === "PENDING" &&
+      dependenciesAccepted(workflow, dependentStepId, statuses)
+  );
+}
+
+function allWorkflowStepsAccepted(
+  workflow: WorkflowYaml,
+  statuses: Map<string, string>
+) {
+  return workflow.steps.every((step) => statuses.get(step.id) === "ACCEPTED");
 }
 
 export async function registerHumanDecisionRoutes(app: FastifyInstance) {
@@ -59,7 +102,7 @@ export async function registerHumanDecisionRoutes(app: FastifyInstance) {
 
     const now = new Date();
     const verdict = DECISION_VERDICT_TO_DB[body.verdict];
-    const downstream = downstreamStepId(
+    const workflow = workflowForStep(
       stepRun.workflowRun.workflowVersion.yamlSnapshot,
       stepRun.stepId
     );
@@ -107,32 +150,54 @@ export async function registerHumanDecisionRoutes(app: FastifyInstance) {
           }
         });
 
-        if (downstream) {
+        const statuses = statusByStepId(
+          await db.stepRun.findMany({
+            where: {
+              workflowRunId: stepRun.workflowRunId
+            },
+            select: {
+              stepId: true,
+              status: true
+            }
+          })
+        );
+        const readyStepIds = readyEligibleDependentStepIds(
+          workflow,
+          stepRun.stepId,
+          statuses
+        );
+
+        if (readyStepIds.length > 0) {
           await db.stepRun.updateMany({
             where: {
               workflowRunId: stepRun.workflowRunId,
-              stepId: downstream,
+              stepId: {
+                in: readyStepIds
+              },
               status: "PENDING"
             },
             data: {
               status: "READY"
             }
           });
-          await db.workflowRun.update({
-            where: { id: stepRun.workflowRunId },
-            data: {
-              status: "RUNNING",
-              startedAt: stepRun.workflowRun.startedAt ?? now,
-              completedAt: null
-            }
-          });
-        } else {
+        }
+
+        if (allWorkflowStepsAccepted(workflow, statuses)) {
           await db.workflowRun.update({
             where: { id: stepRun.workflowRunId },
             data: {
               status: "COMPLETED",
               startedAt: stepRun.workflowRun.startedAt ?? now,
               completedAt: now
+            }
+          });
+        } else {
+          await db.workflowRun.update({
+            where: { id: stepRun.workflowRunId },
+            data: {
+              status: "RUNNING",
+              startedAt: stepRun.workflowRun.startedAt ?? now,
+              completedAt: null
             }
           });
         }

@@ -5,6 +5,10 @@ import {
   type Prisma,
   type StepRunEvaluator,
 } from "../generated/prisma/client.js";
+import {
+  directDependentStepIds,
+  type WorkflowYaml
+} from "@workflow-software/shared";
 import { prisma } from "../db/prisma.js";
 import { env } from "../config/env.js";
 import type { ExecuteStepRunWithCodexInput } from "./codex-step-executor.js";
@@ -49,11 +53,19 @@ type ReadyStepRun = {
   };
 };
 
+type WorkflowStepRunStatus = {
+  stepId: string;
+  status: string;
+};
+
 type StepRunnerClient = {
   stepRun: {
     findFirst(
       args: Prisma.StepRunFindFirstArgs,
     ): PromiseLike<ReadyStepRun | null>;
+    findMany(
+      args: Prisma.StepRunFindManyArgs,
+    ): PromiseLike<WorkflowStepRunStatus[]>;
     findUnique(args: Prisma.StepRunFindUniqueArgs): PromiseLike<{
       status: string;
       codexError: Prisma.JsonValue | null;
@@ -332,13 +344,13 @@ async function readyDownstreamStep(
   client: StepRunnerClient,
   input: {
     workflowRunId: string;
-    downstreamStepId: string;
+    dependentStepId: string;
   },
 ) {
   const result = await client.stepRun.updateMany({
     where: {
       workflowRunId: input.workflowRunId,
-      stepId: input.downstreamStepId,
+      stepId: input.dependentStepId,
       status: "PENDING",
     },
     data: {
@@ -348,16 +360,88 @@ async function readyDownstreamStep(
 
   if (result.count !== 1) {
     throw new Error(
-      `Downstream StepRun ${input.downstreamStepId} was not PENDING`,
+      `Dependent StepRun ${input.dependentStepId} was not PENDING`,
     );
   }
   console.log("[runtime.step-runner] downstream.status", {
     workflowRunId: input.workflowRunId,
-    downstreamStepId: input.downstreamStepId,
+    dependentStepId: input.dependentStepId,
     from: "PENDING",
     to: "READY",
     updated: result.count,
   });
+}
+
+async function workflowStepRunStatuses(
+  client: StepRunnerClient,
+  workflowRunId: string,
+) {
+  return client.stepRun.findMany({
+    where: {
+      workflowRunId,
+    },
+    select: {
+      stepId: true,
+      status: true,
+    },
+  });
+}
+
+function statusByStepId(stepRuns: WorkflowStepRunStatus[]) {
+  return new Map(stepRuns.map((stepRun) => [stepRun.stepId, stepRun.status]));
+}
+
+function dependenciesAccepted(
+  workflow: WorkflowYaml,
+  stepId: string,
+  statuses: Map<string, string>,
+) {
+  const step = workflow.steps.find((candidate) => candidate.id === stepId);
+
+  return Boolean(
+    step &&
+      step.depends_on.every(
+        (dependencyId) => statuses.get(dependencyId) === "ACCEPTED",
+      ),
+  );
+}
+
+function allWorkflowStepsAccepted(
+  workflow: WorkflowYaml,
+  statuses: Map<string, string>,
+) {
+  return workflow.steps.every((step) => statuses.get(step.id) === "ACCEPTED");
+}
+
+async function readyEligibleDependentSteps(
+  client: StepRunnerClient,
+  input: {
+    workflow: WorkflowYaml;
+    workflowRunId: string;
+    completedStepId: string;
+  },
+) {
+  const statuses = statusByStepId(
+    await workflowStepRunStatuses(client, input.workflowRunId),
+  );
+
+  for (const dependentStepId of directDependentStepIds(
+    input.workflow,
+    input.completedStepId,
+  )) {
+    if (statuses.get(dependentStepId) !== "PENDING") {
+      continue;
+    }
+
+    if (
+      dependenciesAccepted(input.workflow, dependentStepId, statuses)
+    ) {
+      await readyDownstreamStep(client, {
+        workflowRunId: input.workflowRunId,
+        dependentStepId,
+      });
+    }
+  }
 }
 
 async function completeWorkflowRun(
@@ -510,8 +594,8 @@ export async function runNextReadyStep(
       stepRunId: stepRun.id,
       stepId: step.id,
       stepType: step.type,
-      upstreamStepId: step.upstream,
-      downstreamStepId: step.downstream,
+      dependencyStepIds: step.depends_on,
+      dependentStepIds: directDependentStepIds(workflow, step.id),
       evaluator: stepRun.evaluator,
       totalSteps: workflow.steps.length,
     });
@@ -695,13 +779,17 @@ export async function runNextReadyStep(
     }
 
     await markStepRunAccepted(client, stepRun.id, now());
+    await readyEligibleDependentSteps(client, {
+      workflow,
+      workflowRunId: stepRun.workflowRunId,
+      completedStepId: step.id,
+    });
 
-    if (step.downstream) {
-      await readyDownstreamStep(client, {
-        workflowRunId: stepRun.workflowRunId,
-        downstreamStepId: step.downstream,
-      });
-    } else {
+    const statuses = statusByStepId(
+      await workflowStepRunStatuses(client, stepRun.workflowRunId),
+    );
+
+    if (allWorkflowStepsAccepted(workflow, statuses)) {
       await completeWorkflowRun(client, stepRun.workflowRunId, now());
     }
 
