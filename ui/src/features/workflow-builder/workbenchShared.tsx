@@ -126,18 +126,42 @@ export function createEdgesFromSteps(steps: StepDefinition[]): CanvasEdge[] {
 }
 
 export function stepsWithConnections(steps: StepDefinition[], edges: CanvasEdge[]): StepDefinition[] {
+  const stepsById = new Map(steps.map((step) => [step.id, step]));
+
   return steps.map((step) => {
     const { upstream: _upstream, downstream: _downstream, ...stepWithoutLegacy } =
       step as StepDefinition & { upstream?: string; downstream?: string };
     const incoming = edges.filter((edge) => edge.target === step.id);
+    const depends_on = Array.from(
+      new Set(incoming.map((edge) => edge.source).filter((source) => source !== step.id))
+    );
+    const dependencyOutputArtifacts = depends_on.flatMap(
+      (dependencyId) => stepsById.get(dependencyId)?.output_artifacts.map((artifact) => artifact.artifact) ?? []
+    );
 
     return {
       ...stepWithoutLegacy,
-      depends_on: Array.from(
-        new Set(incoming.map((edge) => edge.source).filter((source) => source !== step.id))
-      )
+      depends_on,
+      input_artifacts: appendMissingInputArtifacts(stepWithoutLegacy.input_artifacts, dependencyOutputArtifacts)
     };
   });
+}
+
+function appendMissingInputArtifacts(
+  inputArtifacts: StepDefinition["input_artifacts"],
+  dependencyOutputArtifacts: string[]
+) {
+  const existingArtifacts = new Set(inputArtifacts.map((artifact) => artifact.artifact));
+  const appendedArtifacts = dependencyOutputArtifacts.flatMap((artifact) => {
+    if (existingArtifacts.has(artifact)) {
+      return [];
+    }
+
+    existingArtifacts.add(artifact);
+    return [{ artifact, required: true }];
+  });
+
+  return [...inputArtifacts, ...appendedArtifacts];
 }
 
 export function statusByStepId(stepRuns: StepRunRecord[]) {
