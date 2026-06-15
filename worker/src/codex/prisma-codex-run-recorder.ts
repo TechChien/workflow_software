@@ -30,6 +30,18 @@ export class PrismaCodexRunRecorder implements CodexRunRecorder {
       where: { id: stepRunId },
       select: {
         stepId: true,
+        attempt: true,
+        decisionEvents: {
+          where: {
+            source: "HUMAN"
+          },
+          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+          take: 1,
+          select: {
+            verdict: true,
+            comment: true
+          }
+        },
         workflowRun: {
           select: {
             workflowVersion: {
@@ -42,11 +54,17 @@ export class PrismaCodexRunRecorder implements CodexRunRecorder {
         }
       }
     });
+    const latestHumanDecision = stepRun.decisionEvents[0];
 
     return {
       stepId: stepRun.stepId,
+      attempt: stepRun.attempt,
       yamlSnapshot: stepRun.workflowRun.workflowVersion.yamlSnapshot,
-      contentHash: stepRun.workflowRun.workflowVersion.contentHash
+      contentHash: stepRun.workflowRun.workflowVersion.contentHash,
+      revisionRequestComment:
+        latestHumanDecision?.verdict === "REQUEST_REVISION"
+          ? latestHumanDecision.comment ?? undefined
+          : undefined
     };
   }
 
@@ -82,6 +100,7 @@ export class PrismaCodexRunRecorder implements CodexRunRecorder {
     await this.client.codexInteractionEvent.create({
       data: {
         stepRunId,
+        attempt: event.attempt,
         sequence: event.sequence,
         externalItemId: event.externalItemId,
         kind: event.kind,

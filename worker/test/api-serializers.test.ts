@@ -98,7 +98,19 @@ describe("API serializers", () => {
           decisionEvents: [],
           toolInvocations: [],
           contextPathEvents: [],
-          codexInteractions: [],
+          codexInteractions: [
+            {
+              id: "interaction-1",
+              stepRunId: "step-run-1",
+              attempt: 2,
+              sequence: 1,
+              externalItemId: "message-1",
+              kind: "item.completed",
+              status: "completed",
+              payload: { itemType: "agent_message" },
+              createdAt: now
+            }
+          ],
           codeChangeRecords: []
         }
       ],
@@ -154,6 +166,107 @@ describe("API serializers", () => {
     expect(serialized.decisionEvents[0]).toMatchObject({
       source: "human",
       verdict: "approve"
+    });
+    expect(serialized.stepRuns[0]?.codexInteractions[0]).toMatchObject({
+      attempt: 2,
+      sequence: 1
+    });
+  });
+
+  it("exposes the waiting step run id for human review gates", () => {
+    const now = new Date("2026-06-11T01:00:00.000Z");
+    const workflow = {
+      id: "workflow-yaml-1",
+      name: "Waiting Workflow",
+      version: "0.1.0",
+      inputs: {},
+      artifacts: {},
+      steps: [
+        {
+          id: "step-1",
+          type: "agent" as const,
+          input_artifacts: [],
+          output_artifacts: [],
+          context_paths: [],
+          tool_capabilities: [],
+          evaluate: { evaluator: "human_review" as const },
+          prompt: "Write a summary.",
+          acceptance: { criteria: [] }
+        }
+      ],
+      ui: {}
+    };
+    const row = {
+      id: "run-1",
+      workflowVersionId: "version-1",
+      status: "WAITING",
+      triggerType: "run_button",
+      inputPayload: {},
+      createdAt: now,
+      startedAt: now,
+      completedAt: null,
+      workflowVersion: {
+        id: "version-1",
+        workflowId: "workflow-db-1",
+        revision: 1,
+        yamlSnapshot: stringifyWorkflowYaml(workflow),
+        contentHash: "workflow-hash",
+        publishedAt: now
+      },
+      stepRuns: [
+        {
+          id: "step-run-1",
+          status: "WAITING_FOR_HUMAN_REVIEW"
+        }
+      ]
+    } as unknown as WorkflowRunDetailRow;
+
+    const serialized = serializeWorkflowRunDetail({
+      ...row,
+      stepRuns: [
+        {
+          id: "step-run-1",
+          workflowRunId: "run-1",
+          stepId: "step-1",
+          attempt: 1,
+          status: "WAITING_FOR_HUMAN_REVIEW",
+          evaluator: "HUMAN_REVIEW",
+          upstreamStepRunId: null,
+          downstreamStepRunId: null,
+          codexThreadId: null,
+          promptSnapshot: null,
+          codexOptions: {},
+          codexFinalResponse: null,
+          codexUsage: null,
+          codexError: null,
+          codexCompletedAt: now,
+          codeWorkspaceId: null,
+          beforeCommit: null,
+          afterCommit: null,
+          requiresCodeReview: false,
+          staleReason: null,
+          createdAt: now,
+          startedAt: now,
+          completedAt: null,
+          artifactInputs: [],
+          producedArtifacts: [],
+          decisionEvents: [],
+          toolInvocations: [],
+          contextPathEvents: [],
+          codexInteractions: [],
+          codeChangeRecords: []
+        }
+      ],
+      artifactVersions: [],
+      decisionEvents: [],
+      runEvents: [],
+      codeWorkspaces: []
+    } as unknown as WorkflowRunDetailRow);
+
+    expect(serialized).toMatchObject({
+      status: "waiting",
+      waitingStepRunId: "step-run-1",
+      completedStepCount: 0
     });
   });
 });

@@ -27,10 +27,11 @@ export function useRunHistoryView(): RunHistoryViewModel {
   const [localRuns, setLocalRuns] = useState<RunRecord[]>([]);
   const [selectedRunId, setSelectedRunId] = useState("");
   const [selectedStepRunId, setSelectedStepRunId] = useState("");
-  const runHistoryQuery = useRunHistory({ limit: 50 });
+  const runHistoryQuery = useRunHistory({ limit: 50 }, { refetchInterval: 5_000 });
   const localSelectedRun = localRuns.find((run) => run.id === selectedRunId);
   const selectedRunQuery = useWorkflowRun(selectedRunId, {
-    enabled: Boolean(selectedRunId) && !localSelectedRun
+    enabled: Boolean(selectedRunId),
+    refetchInterval: 2_500
   });
   const apiRuns = useMemo(
     () => (runHistoryQuery.data?.items ?? []).map(toRunRecord),
@@ -43,7 +44,7 @@ export function useRunHistoryView(): RunHistoryViewModel {
   const apiSelectedRun = selectedRunQuery.data
     ? toRunRecord(selectedRunQuery.data)
     : runs.find((run) => run.id === selectedRunId);
-  const selectedRun = localSelectedRun ?? apiSelectedRun ?? runs[0];
+  const selectedRun = apiSelectedRun ?? localSelectedRun ?? runs[0];
   const selectedStepRun =
     selectedRun?.stepRuns.find((stepRun) => stepRun.id === selectedStepRunId) ?? selectedRun?.stepRuns[0];
 
@@ -64,6 +65,15 @@ export function useRunHistoryView(): RunHistoryViewModel {
       return;
     }
 
+    if (
+      selectedRun.waitingStepRunId &&
+      selectedRun.stepRuns.some((stepRun) => stepRun.id === selectedRun.waitingStepRunId) &&
+      selectedStepRunId !== selectedRun.waitingStepRunId
+    ) {
+      setSelectedStepRunId(selectedRun.waitingStepRunId);
+      return;
+    }
+
     if (!selectedStepRunId || !selectedRun.stepRuns.some((stepRun) => stepRun.id === selectedStepRunId)) {
       setSelectedStepRunId(selectedRun.stepRuns[0]?.id ?? "");
     }
@@ -72,13 +82,13 @@ export function useRunHistoryView(): RunHistoryViewModel {
   const addRun = useCallback((run: RunRecord) => {
     setLocalRuns((runs) => [run, ...runs]);
     setSelectedRunId(run.id);
-    setSelectedStepRunId(run.stepRuns[0]?.id ?? "");
+    setSelectedStepRunId(run.waitingStepRunId ?? run.stepRuns[0]?.id ?? "");
   }, []);
 
   const selectRun = useCallback(
     (run: RunRecord) => {
       setSelectedRunId(run.id);
-      setSelectedStepRunId(run.stepRuns[0]?.id ?? "");
+      setSelectedStepRunId(run.waitingStepRunId ?? run.stepRuns[0]?.id ?? "");
       setLeftTab("history");
       setViewMode("run");
     },
@@ -99,7 +109,7 @@ export function useRunHistoryView(): RunHistoryViewModel {
   };
 }
 
-function toRunRecord(run: WorkflowRunSummary | WorkflowRunDetail): RunRecord {
+export function toRunRecord(run: WorkflowRunSummary | WorkflowRunDetail): RunRecord {
   return {
     id: run.id,
     workflowVersionId: run.workflowVersionId,
@@ -109,7 +119,8 @@ function toRunRecord(run: WorkflowRunSummary | WorkflowRunDetail): RunRecord {
     startedAt: formatApiDate(run.startedAt ?? run.createdAt),
     completedAt: run.completedAt ? formatApiDate(run.completedAt) : undefined,
     workflow: "workflow" in run ? run.workflow : createWorkflowYaml(run.workflowId, run.workflowName, []),
-    stepRuns: "stepRuns" in run ? run.stepRuns.map(toStepRunRecord) : []
+    stepRuns: "stepRuns" in run ? run.stepRuns.map(toStepRunRecord) : [],
+    waitingStepRunId: run.waitingStepRunId
   };
 }
 
@@ -121,10 +132,14 @@ function toStepRunRecord(stepRun: WorkflowRunDetail["stepRuns"][number]): StepRu
     attempt: stepRun.attempt,
     evaluator: stepRun.evaluator,
     artifacts: stepRun.producedArtifacts.map((artifact) => ({
+      id: artifact.id,
       key: artifact.artifactKey,
       version: artifact.displayVersion ?? `v${artifact.version}`,
-      status: artifact.status
+      status: artifact.status,
+      filename: artifact.filename,
+      format: artifact.format
     })),
+    decisionEvents: stepRun.decisionEvents,
     codexUsage: parseCodexUsage(stepRun.codexUsage),
     codexError: parseCodexError(stepRun.codexError),
     staleReason: stepRun.staleReason

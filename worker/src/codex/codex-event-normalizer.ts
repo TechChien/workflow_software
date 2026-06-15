@@ -1,7 +1,7 @@
 import type { ThreadEvent, ThreadItem } from "@openai/codex-sdk";
 import type { RecordedCodexEvent } from "./codex-run-recorder.js";
 
-type UnsequencedCodexEvent = Omit<RecordedCodexEvent, "sequence">;
+type UnsequencedCodexEvent = Omit<RecordedCodexEvent, "attempt" | "sequence">;
 
 function completedItemStatus(item: ThreadItem): "completed" | "failed" {
   switch (item.type) {

@@ -221,6 +221,7 @@ export function createRunRecord(workflow: PublishedWorkflow) {
         version: status === "pending" ? "queued" : "v1",
         status: status === "accepted" ? "accepted" : status
       })),
+      decisionEvents: [],
       codexUsage: status === "accepted" ? { inputTokens: 2400 + index * 860, outputTokens: 720 + index * 210 } : undefined
     };
   });
@@ -264,13 +265,16 @@ export function statusTone(status: string) {
   if (["running", "ready"].includes(status)) {
     return "tone-blue";
   }
-  if (status.startsWith("waiting") || ["draft", "pending", "mixed", "human_review", "evaluator_review"].includes(status)) {
+  if (
+    status.startsWith("waiting") ||
+    ["draft", "pending", "mixed", "human_review", "evaluator_review", "request_revision"].includes(status)
+  ) {
     return "tone-amber";
   }
-  if (["accepted", "completed", "published", "saved"].includes(status)) {
+  if (["accepted", "completed", "published", "saved", "approve"].includes(status)) {
     return "tone-green";
   }
-  if (["rejected", "failed", "stale", "error"].includes(status)) {
+  if (["rejected", "reject", "failed", "stale", "error"].includes(status)) {
     return "tone-red";
   }
   if (status === "readonly") {

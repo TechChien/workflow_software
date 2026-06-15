@@ -27,16 +27,19 @@ export type AggregateCodexInteractionEvent = {
 }
 
 export type CodexInteractionEventAvgAggregateOutputType = {
+  attempt: number | null
   sequence: number | null
 }
 
 export type CodexInteractionEventSumAggregateOutputType = {
+  attempt: number | null
   sequence: number | null
 }
 
 export type CodexInteractionEventMinAggregateOutputType = {
   id: string | null
   stepRunId: string | null
+  attempt: number | null
   sequence: number | null
   externalItemId: string | null
   kind: string | null
@@ -47,6 +50,7 @@ export type CodexInteractionEventMinAggregateOutputType = {
 export type CodexInteractionEventMaxAggregateOutputType = {
   id: string | null
   stepRunId: string | null
+  attempt: number | null
   sequence: number | null
   externalItemId: string | null
   kind: string | null
@@ -57,6 +61,7 @@ export type CodexInteractionEventMaxAggregateOutputType = {
 export type CodexInteractionEventCountAggregateOutputType = {
   id: number
   stepRunId: number
+  attempt: number
   sequence: number
   externalItemId: number
   kind: number
@@ -68,16 +73,19 @@ export type CodexInteractionEventCountAggregateOutputType = {
 
 
 export type CodexInteractionEventAvgAggregateInputType = {
+  attempt?: true
   sequence?: true
 }
 
 export type CodexInteractionEventSumAggregateInputType = {
+  attempt?: true
   sequence?: true
 }
 
 export type CodexInteractionEventMinAggregateInputType = {
   id?: true
   stepRunId?: true
+  attempt?: true
   sequence?: true
   externalItemId?: true
   kind?: true
@@ -88,6 +96,7 @@ export type CodexInteractionEventMinAggregateInputType = {
 export type CodexInteractionEventMaxAggregateInputType = {
   id?: true
   stepRunId?: true
+  attempt?: true
   sequence?: true
   externalItemId?: true
   kind?: true
@@ -98,6 +107,7 @@ export type CodexInteractionEventMaxAggregateInputType = {
 export type CodexInteractionEventCountAggregateInputType = {
   id?: true
   stepRunId?: true
+  attempt?: true
   sequence?: true
   externalItemId?: true
   kind?: true
@@ -196,6 +206,7 @@ export type CodexInteractionEventGroupByArgs<ExtArgs extends runtime.Types.Exten
 export type CodexInteractionEventGroupByOutputType = {
   id: string
   stepRunId: string
+  attempt: number
   sequence: number
   externalItemId: string | null
   kind: string
@@ -230,6 +241,7 @@ export type CodexInteractionEventWhereInput = {
   NOT?: Prisma.CodexInteractionEventWhereInput | Prisma.CodexInteractionEventWhereInput[]
   id?: Prisma.StringFilter<"CodexInteractionEvent"> | string
   stepRunId?: Prisma.StringFilter<"CodexInteractionEvent"> | string
+  attempt?: Prisma.IntFilter<"CodexInteractionEvent"> | number
   sequence?: Prisma.IntFilter<"CodexInteractionEvent"> | number
   externalItemId?: Prisma.StringNullableFilter<"CodexInteractionEvent"> | string | null
   kind?: Prisma.StringFilter<"CodexInteractionEvent"> | string
@@ -242,6 +254,7 @@ export type CodexInteractionEventWhereInput = {
 export type CodexInteractionEventOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   stepRunId?: Prisma.SortOrder
+  attempt?: Prisma.SortOrder
   sequence?: Prisma.SortOrder
   externalItemId?: Prisma.SortOrderInput | Prisma.SortOrder
   kind?: Prisma.SortOrder
@@ -253,12 +266,13 @@ export type CodexInteractionEventOrderByWithRelationInput = {
 
 export type CodexInteractionEventWhereUniqueInput = Prisma.AtLeast<{
   id?: string
-  stepRunId_sequence?: Prisma.CodexInteractionEventStepRunIdSequenceCompoundUniqueInput
-  stepRunId_externalItemId?: Prisma.CodexInteractionEventStepRunIdExternalItemIdCompoundUniqueInput
+  stepRunId_attempt_sequence?: Prisma.CodexInteractionEventStepRunIdAttemptSequenceCompoundUniqueInput
+  stepRunId_attempt_externalItemId?: Prisma.CodexInteractionEventStepRunIdAttemptExternalItemIdCompoundUniqueInput
   AND?: Prisma.CodexInteractionEventWhereInput | Prisma.CodexInteractionEventWhereInput[]
   OR?: Prisma.CodexInteractionEventWhereInput[]
   NOT?: Prisma.CodexInteractionEventWhereInput | Prisma.CodexInteractionEventWhereInput[]
   stepRunId?: Prisma.StringFilter<"CodexInteractionEvent"> | string
+  attempt?: Prisma.IntFilter<"CodexInteractionEvent"> | number
   sequence?: Prisma.IntFilter<"CodexInteractionEvent"> | number
   externalItemId?: Prisma.StringNullableFilter<"CodexInteractionEvent"> | string | null
   kind?: Prisma.StringFilter<"CodexInteractionEvent"> | string
@@ -266,11 +280,12 @@ export type CodexInteractionEventWhereUniqueInput = Prisma.AtLeast<{
   payload?: Prisma.JsonFilter<"CodexInteractionEvent">
   createdAt?: Prisma.DateTimeFilter<"CodexInteractionEvent"> | Date | string
   stepRun?: Prisma.XOR<Prisma.StepRunScalarRelationFilter, Prisma.StepRunWhereInput>
-}, "id" | "stepRunId_sequence" | "stepRunId_externalItemId">
+}, "id" | "stepRunId_attempt_sequence" | "stepRunId_attempt_externalItemId">
 
 export type CodexInteractionEventOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   stepRunId?: Prisma.SortOrder
+  attempt?: Prisma.SortOrder
   sequence?: Prisma.SortOrder
   externalItemId?: Prisma.SortOrderInput | Prisma.SortOrder
   kind?: Prisma.SortOrder
@@ -290,6 +305,7 @@ export type CodexInteractionEventScalarWhereWithAggregatesInput = {
   NOT?: Prisma.CodexInteractionEventScalarWhereWithAggregatesInput | Prisma.CodexInteractionEventScalarWhereWithAggregatesInput[]
   id?: Prisma.StringWithAggregatesFilter<"CodexInteractionEvent"> | string
   stepRunId?: Prisma.StringWithAggregatesFilter<"CodexInteractionEvent"> | string
+  attempt?: Prisma.IntWithAggregatesFilter<"CodexInteractionEvent"> | number
   sequence?: Prisma.IntWithAggregatesFilter<"CodexInteractionEvent"> | number
   externalItemId?: Prisma.StringNullableWithAggregatesFilter<"CodexInteractionEvent"> | string | null
   kind?: Prisma.StringWithAggregatesFilter<"CodexInteractionEvent"> | string
@@ -300,6 +316,7 @@ export type CodexInteractionEventScalarWhereWithAggregatesInput = {
 
 export type CodexInteractionEventCreateInput = {
   id?: string
+  attempt?: number
   sequence: number
   externalItemId?: string | null
   kind: string
@@ -312,6 +329,7 @@ export type CodexInteractionEventCreateInput = {
 export type CodexInteractionEventUncheckedCreateInput = {
   id?: string
   stepRunId: string
+  attempt?: number
   sequence: number
   externalItemId?: string | null
   kind: string
@@ -322,6 +340,7 @@ export type CodexInteractionEventUncheckedCreateInput = {
 
 export type CodexInteractionEventUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  attempt?: Prisma.IntFieldUpdateOperationsInput | number
   sequence?: Prisma.IntFieldUpdateOperationsInput | number
   externalItemId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   kind?: Prisma.StringFieldUpdateOperationsInput | string
@@ -334,6 +353,7 @@ export type CodexInteractionEventUpdateInput = {
 export type CodexInteractionEventUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   stepRunId?: Prisma.StringFieldUpdateOperationsInput | string
+  attempt?: Prisma.IntFieldUpdateOperationsInput | number
   sequence?: Prisma.IntFieldUpdateOperationsInput | number
   externalItemId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   kind?: Prisma.StringFieldUpdateOperationsInput | string
@@ -345,6 +365,7 @@ export type CodexInteractionEventUncheckedUpdateInput = {
 export type CodexInteractionEventCreateManyInput = {
   id?: string
   stepRunId: string
+  attempt?: number
   sequence: number
   externalItemId?: string | null
   kind: string
@@ -355,6 +376,7 @@ export type CodexInteractionEventCreateManyInput = {
 
 export type CodexInteractionEventUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  attempt?: Prisma.IntFieldUpdateOperationsInput | number
   sequence?: Prisma.IntFieldUpdateOperationsInput | number
   externalItemId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   kind?: Prisma.StringFieldUpdateOperationsInput | string
@@ -366,6 +388,7 @@ export type CodexInteractionEventUpdateManyMutationInput = {
 export type CodexInteractionEventUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   stepRunId?: Prisma.StringFieldUpdateOperationsInput | string
+  attempt?: Prisma.IntFieldUpdateOperationsInput | number
   sequence?: Prisma.IntFieldUpdateOperationsInput | number
   externalItemId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   kind?: Prisma.StringFieldUpdateOperationsInput | string
@@ -384,19 +407,22 @@ export type CodexInteractionEventOrderByRelationAggregateInput = {
   _count?: Prisma.SortOrder
 }
 
-export type CodexInteractionEventStepRunIdSequenceCompoundUniqueInput = {
+export type CodexInteractionEventStepRunIdAttemptSequenceCompoundUniqueInput = {
   stepRunId: string
+  attempt: number
   sequence: number
 }
 
-export type CodexInteractionEventStepRunIdExternalItemIdCompoundUniqueInput = {
+export type CodexInteractionEventStepRunIdAttemptExternalItemIdCompoundUniqueInput = {
   stepRunId: string
+  attempt: number
   externalItemId: string
 }
 
 export type CodexInteractionEventCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   stepRunId?: Prisma.SortOrder
+  attempt?: Prisma.SortOrder
   sequence?: Prisma.SortOrder
   externalItemId?: Prisma.SortOrder
   kind?: Prisma.SortOrder
@@ -406,12 +432,14 @@ export type CodexInteractionEventCountOrderByAggregateInput = {
 }
 
 export type CodexInteractionEventAvgOrderByAggregateInput = {
+  attempt?: Prisma.SortOrder
   sequence?: Prisma.SortOrder
 }
 
 export type CodexInteractionEventMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
   stepRunId?: Prisma.SortOrder
+  attempt?: Prisma.SortOrder
   sequence?: Prisma.SortOrder
   externalItemId?: Prisma.SortOrder
   kind?: Prisma.SortOrder
@@ -422,6 +450,7 @@ export type CodexInteractionEventMaxOrderByAggregateInput = {
 export type CodexInteractionEventMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
   stepRunId?: Prisma.SortOrder
+  attempt?: Prisma.SortOrder
   sequence?: Prisma.SortOrder
   externalItemId?: Prisma.SortOrder
   kind?: Prisma.SortOrder
@@ -430,6 +459,7 @@ export type CodexInteractionEventMinOrderByAggregateInput = {
 }
 
 export type CodexInteractionEventSumOrderByAggregateInput = {
+  attempt?: Prisma.SortOrder
   sequence?: Prisma.SortOrder
 }
 
@@ -477,6 +507,7 @@ export type CodexInteractionEventUncheckedUpdateManyWithoutStepRunNestedInput = 
 
 export type CodexInteractionEventCreateWithoutStepRunInput = {
   id?: string
+  attempt?: number
   sequence: number
   externalItemId?: string | null
   kind: string
@@ -487,6 +518,7 @@ export type CodexInteractionEventCreateWithoutStepRunInput = {
 
 export type CodexInteractionEventUncheckedCreateWithoutStepRunInput = {
   id?: string
+  attempt?: number
   sequence: number
   externalItemId?: string | null
   kind: string
@@ -527,6 +559,7 @@ export type CodexInteractionEventScalarWhereInput = {
   NOT?: Prisma.CodexInteractionEventScalarWhereInput | Prisma.CodexInteractionEventScalarWhereInput[]
   id?: Prisma.StringFilter<"CodexInteractionEvent"> | string
   stepRunId?: Prisma.StringFilter<"CodexInteractionEvent"> | string
+  attempt?: Prisma.IntFilter<"CodexInteractionEvent"> | number
   sequence?: Prisma.IntFilter<"CodexInteractionEvent"> | number
   externalItemId?: Prisma.StringNullableFilter<"CodexInteractionEvent"> | string | null
   kind?: Prisma.StringFilter<"CodexInteractionEvent"> | string
@@ -537,6 +570,7 @@ export type CodexInteractionEventScalarWhereInput = {
 
 export type CodexInteractionEventCreateManyStepRunInput = {
   id?: string
+  attempt?: number
   sequence: number
   externalItemId?: string | null
   kind: string
@@ -547,6 +581,7 @@ export type CodexInteractionEventCreateManyStepRunInput = {
 
 export type CodexInteractionEventUpdateWithoutStepRunInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  attempt?: Prisma.IntFieldUpdateOperationsInput | number
   sequence?: Prisma.IntFieldUpdateOperationsInput | number
   externalItemId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   kind?: Prisma.StringFieldUpdateOperationsInput | string
@@ -557,6 +592,7 @@ export type CodexInteractionEventUpdateWithoutStepRunInput = {
 
 export type CodexInteractionEventUncheckedUpdateWithoutStepRunInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  attempt?: Prisma.IntFieldUpdateOperationsInput | number
   sequence?: Prisma.IntFieldUpdateOperationsInput | number
   externalItemId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   kind?: Prisma.StringFieldUpdateOperationsInput | string
@@ -567,6 +603,7 @@ export type CodexInteractionEventUncheckedUpdateWithoutStepRunInput = {
 
 export type CodexInteractionEventUncheckedUpdateManyWithoutStepRunInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  attempt?: Prisma.IntFieldUpdateOperationsInput | number
   sequence?: Prisma.IntFieldUpdateOperationsInput | number
   externalItemId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   kind?: Prisma.StringFieldUpdateOperationsInput | string
@@ -580,6 +617,7 @@ export type CodexInteractionEventUncheckedUpdateManyWithoutStepRunInput = {
 export type CodexInteractionEventSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   stepRunId?: boolean
+  attempt?: boolean
   sequence?: boolean
   externalItemId?: boolean
   kind?: boolean
@@ -592,6 +630,7 @@ export type CodexInteractionEventSelect<ExtArgs extends runtime.Types.Extensions
 export type CodexInteractionEventSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   stepRunId?: boolean
+  attempt?: boolean
   sequence?: boolean
   externalItemId?: boolean
   kind?: boolean
@@ -604,6 +643,7 @@ export type CodexInteractionEventSelectCreateManyAndReturn<ExtArgs extends runti
 export type CodexInteractionEventSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   stepRunId?: boolean
+  attempt?: boolean
   sequence?: boolean
   externalItemId?: boolean
   kind?: boolean
@@ -616,6 +656,7 @@ export type CodexInteractionEventSelectUpdateManyAndReturn<ExtArgs extends runti
 export type CodexInteractionEventSelectScalar = {
   id?: boolean
   stepRunId?: boolean
+  attempt?: boolean
   sequence?: boolean
   externalItemId?: boolean
   kind?: boolean
@@ -624,7 +665,7 @@ export type CodexInteractionEventSelectScalar = {
   createdAt?: boolean
 }
 
-export type CodexInteractionEventOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "stepRunId" | "sequence" | "externalItemId" | "kind" | "status" | "payload" | "createdAt", ExtArgs["result"]["codexInteractionEvent"]>
+export type CodexInteractionEventOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "stepRunId" | "attempt" | "sequence" | "externalItemId" | "kind" | "status" | "payload" | "createdAt", ExtArgs["result"]["codexInteractionEvent"]>
 export type CodexInteractionEventInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   stepRun?: boolean | Prisma.StepRunDefaultArgs<ExtArgs>
 }
@@ -643,6 +684,7 @@ export type $CodexInteractionEventPayload<ExtArgs extends runtime.Types.Extensio
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
     stepRunId: string
+    attempt: number
     sequence: number
     externalItemId: string | null
     kind: string
@@ -1075,6 +1117,7 @@ export interface Prisma__CodexInteractionEventClient<T, Null = never, ExtArgs ex
 export interface CodexInteractionEventFieldRefs {
   readonly id: Prisma.FieldRef<"CodexInteractionEvent", 'String'>
   readonly stepRunId: Prisma.FieldRef<"CodexInteractionEvent", 'String'>
+  readonly attempt: Prisma.FieldRef<"CodexInteractionEvent", 'Int'>
   readonly sequence: Prisma.FieldRef<"CodexInteractionEvent", 'Int'>
   readonly externalItemId: Prisma.FieldRef<"CodexInteractionEvent", 'String'>
   readonly kind: Prisma.FieldRef<"CodexInteractionEvent", 'String'>

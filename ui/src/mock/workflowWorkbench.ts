@@ -1,4 +1,5 @@
 import type { StepDefinition, WorkflowYaml } from "@workflow-software/shared";
+import type { DecisionEvent } from "@/lib/api/api-contract";
 
 export type StepRunStatus =
   | "pending"
@@ -32,7 +33,15 @@ export type StepRunRecord = {
   status: StepRunStatus;
   attempt: number;
   evaluator: StepDefinition["evaluate"]["evaluator"];
-  artifacts: Array<{ key: string; version: string; status: string }>;
+  artifacts: Array<{
+    id?: string;
+    key: string;
+    version: string;
+    status: string;
+    filename?: string;
+    format?: "markdown" | "plain_text";
+  }>;
+  decisionEvents: DecisionEvent[];
   codexUsage?: { inputTokens: number; outputTokens: number };
   codexError?: string;
   staleReason?: string;
@@ -48,6 +57,7 @@ export type RunRecord = {
   completedAt?: string;
   workflow: WorkflowYaml;
   stepRuns: StepRunRecord[];
+  waitingStepRunId?: string;
 };
 
 export const sampleSteps: StepDefinition[] = [
@@ -166,6 +176,7 @@ export const initialRuns: RunRecord[] = [
         attempt: 1,
         evaluator: "mixed",
         artifacts: [{ key: "g1_requirements", version: "v2", status: "accepted" }],
+        decisionEvents: [],
         codexUsage: { inputTokens: 3182, outputTokens: 928 }
       },
       {
@@ -177,6 +188,7 @@ export const initialRuns: RunRecord[] = [
         artifacts: [
           { key: "g2_backend_gap_summary", version: "v2", status: "accepted" }
         ],
+        decisionEvents: [],
         codexUsage: { inputTokens: 8194, outputTokens: 2142 }
       },
       {
@@ -186,6 +198,7 @@ export const initialRuns: RunRecord[] = [
         attempt: 1,
         evaluator: "human_review",
         artifacts: [{ key: "g3_ui_gap_summary", version: "v1", status: "accepted" }],
+        decisionEvents: [],
         codexUsage: { inputTokens: 6021, outputTokens: 1548 }
       },
       {
@@ -195,6 +208,7 @@ export const initialRuns: RunRecord[] = [
         attempt: 1,
         evaluator: "mixed",
         artifacts: [{ key: "g4_plan", version: "v1", status: "accepted" }],
+        decisionEvents: [],
         codexUsage: { inputTokens: 4440, outputTokens: 1375 }
       }
     ]

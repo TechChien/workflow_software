@@ -9,6 +9,7 @@ import {
 } from "@xyflow/react";
 import { useMemo, useState } from "react";
 import { type PublishedWorkflow } from "@/mock/workflowWorkbench";
+import { useCreateWorkflowRun } from "@/services/worker-api-service";
 import { ComponentLibrary, componentTemplates } from "./ComponentLibrary";
 import { DraftInspector } from "./DraftInspector";
 import { DraftList } from "./DraftList";
@@ -17,7 +18,7 @@ import {
   usePublishedWorkflowsView,
   type PublishedWorkflowsViewModel
 } from "./hooks/usePublishedWorkflowsView";
-import { useRunHistoryView, type RunHistoryViewModel } from "./hooks/useRunHistoryView";
+import { toRunRecord, useRunHistoryView, type RunHistoryViewModel } from "./hooks/useRunHistoryView";
 import { Icon } from "./Icon";
 import { PublishedInspector } from "./PublishedInspector";
 import { PublishedList } from "./PublishedList";
@@ -30,7 +31,6 @@ import { WorkflowTopbar } from "./WorkflowTopbar";
 import {
   createEdgesFromSteps,
   createNodes,
-  createRunRecord,
   statusByStepId,
   StatusBadge,
   viewModeLabel,
@@ -55,6 +55,7 @@ function WorkflowWorkbenchInner() {
   const draftView = useDraftView();
   const publishedView = usePublishedWorkflowsView();
   const runHistoryView = useRunHistoryView();
+  const createRunMutation = useCreateWorkflowRun();
 
   const handlePublish = async () => {
     const published = await draftView.publishDraft();
@@ -63,13 +64,16 @@ function WorkflowWorkbenchInner() {
     setViewMode("published");
   };
 
-  const handleRun = (workflow = publishedView.selectedWorkflow) => {
+  const handleRun = async (workflow = publishedView.selectedWorkflow) => {
     if (!workflow) {
       return;
     }
 
-    const run = createRunRecord(workflow);
-    runHistoryView.addRun(run);
+    const run = await createRunMutation.mutateAsync({
+      workflowVersionId: workflow.id,
+      body: { inputPayload: {} }
+    });
+    runHistoryView.addRun(toRunRecord(run));
     publishedView.updateLastRunStatus(workflow.id, run.status);
     setLeftTab("history");
     setViewMode("run");
@@ -85,6 +89,8 @@ function WorkflowWorkbenchInner() {
         draftView={draftView}
         onPublish={handlePublish}
         onRun={() => handleRun()}
+        isRunningWorkflow={createRunMutation.isPending}
+        runErrorMessage={createRunMutation.error?.message}
         selectedPublishedWorkflow={publishedView.selectedWorkflow}
       />
 
@@ -146,7 +152,7 @@ function LeftWorkbenchSection({
   isCollapsed: boolean;
   onCollapse: () => void;
   onExpand: () => void;
-  onRun: (workflow?: PublishedWorkflow) => void;
+  onRun: (workflow?: PublishedWorkflow) => void | Promise<void>;
   onSelectTab: (tab: LeftTab) => void;
   publishedView: PublishedWorkflowsViewModel;
   runHistoryView: RunHistoryViewModel;
@@ -365,7 +371,7 @@ function RightInspectorSection({
   viewMode
 }: {
   draftView: DraftViewModel;
-  onRun: (workflow?: PublishedWorkflow) => void;
+  onRun: (workflow?: PublishedWorkflow) => void | Promise<void>;
   publishedView: PublishedWorkflowsViewModel;
   runHistoryView: RunHistoryViewModel;
   viewMode: WorkbenchView;

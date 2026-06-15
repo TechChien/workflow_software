@@ -1527,6 +1527,7 @@ export type DecisionEventScalarFieldEnum = (typeof DecisionEventScalarFieldEnum)
 export const CodexInteractionEventScalarFieldEnum = {
   id: 'id',
   stepRunId: 'stepRunId',
+  attempt: 'attempt',
   sequence: 'sequence',
   externalItemId: 'externalItemId',
   kind: 'kind',

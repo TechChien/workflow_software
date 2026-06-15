@@ -16,7 +16,7 @@ export function PublishedList({
   workflows: PublishedWorkflow[];
   selectedId: string;
   onSelect: (workflow: PublishedWorkflow) => void;
-  onRun: (workflow: PublishedWorkflow) => void;
+  onRun: (workflow: PublishedWorkflow) => void | Promise<void>;
 }) {
   return (
     <div className="panel-section" role="tabpanel">
@@ -52,7 +52,7 @@ export function PublishedList({
             </button>
             <span className="record-footer">
               <StatusBadge status={workflow.lastRunStatus} label={workflow.lastRunStatus} />
-              <button type="button" className="inline-action" onClick={() => onRun(workflow)}>
+              <button type="button" className="inline-action" onClick={() => void onRun(workflow)}>
                 Run
               </button>
             </span>

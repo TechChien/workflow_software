@@ -33,7 +33,8 @@ const usage: Usage = {
 function sourceFor(
   prompt: string,
   type: "agent" | "code_agent" = "agent",
-  acceptanceCriteria: string[] = []
+  acceptanceCriteria: string[] = [],
+  revisionRequestComment?: string
 ) {
   const snapshot = canonicalizeWorkflowDefinition({
     id: "workflow-1",
@@ -61,8 +62,10 @@ function sourceFor(
 
   return {
     stepId: "step-1",
+    attempt: revisionRequestComment ? 2 : 1,
     yamlSnapshot: snapshot.yaml,
-    contentHash: snapshot.contentHash
+    contentHash: snapshot.contentHash,
+    revisionRequestComment
   };
 }
 
@@ -285,6 +288,36 @@ describe("executeStepRunWithCodexCore", () => {
     expect(recorder.started?.promptSnapshot).toBe(gateway.requests[0]?.prompt);
   });
 
+  it("adds the latest human revision request to rerun prompts", async () => {
+    const recorder = new MemoryRecorder(
+      sourceFor(
+        "Write the release summary.",
+        "agent",
+        ["The summary names shipped features."],
+        "Mention the rollback risk before approval."
+      )
+    );
+    const gateway = new FakeGateway(() => eventStream(...successfulEvents()));
+
+    await executeStepRunWithCodexCore(
+      {
+        stepRunId: "step-run-revision",
+        workingDirectory: process.cwd()
+      },
+      dependencies(recorder, gateway)
+    );
+
+    expect(gateway.requests[0]?.prompt).toContain("## Human Revision Request");
+    expect(gateway.requests[0]?.prompt).toContain(
+      "Mention the rollback risk before approval."
+    );
+    expect(gateway.requests[0]?.prompt).toContain(
+      "## Step Prompt\n\nWrite the release summary."
+    );
+    expect(recorder.events[0]?.attempt).toBe(2);
+    expect(recorder.started?.promptSnapshot).toBe(gateway.requests[0]?.prompt);
+  });
+
   it("adds the runtime artifact contract when declared outputs are present", async () => {
     const recorder = new MemoryRecorder(
       sourceFor("Write obsolete.md and extra.md, then finish.")
@@ -465,6 +498,7 @@ describe("executeStepRunWithCodexCore", () => {
 
     expect(recorder.events).toEqual([
       {
+        attempt: 1,
         sequence: 1,
         kind: "turn.failed",
         status: "failed",

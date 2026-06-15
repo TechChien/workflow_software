@@ -21,7 +21,6 @@ import type {
 } from "./artifact-runtime.js";
 
 const MAX_EVALUATOR_ARTIFACT_CHARS = 20_000;
-const HUMAN_AUTO_APPROVE_COMMENT = "Auto-approved by the v1 human review gate.";
 
 export const EVALUATOR_OUTPUT_SCHEMA = {
   type: "object",
@@ -503,15 +502,6 @@ async function runCodexEvaluator(
   }
 }
 
-function humanAutoApproveDecision(stepRunId: string): EvaluatorDecision {
-  return {
-    stepRunId,
-    source: DecisionSource.HUMAN,
-    verdict: DecisionVerdict.APPROVE,
-    comment: HUMAN_AUTO_APPROVE_COMMENT
-  };
-}
-
 export async function evaluateStepArtifact(
   input: EvaluateStepInput,
   dependencies: EvaluatorRunnerDependencies = {}
@@ -525,10 +515,9 @@ export async function evaluateStepArtifact(
   });
 
   if (input.evaluator === StepRunEvaluator.HUMAN_REVIEW) {
-    console.log("[runtime.evaluator] human_review.auto_approve", {
+    console.log("[runtime.evaluator] human_review.defer_to_human", {
       workflowRunId: input.workflowRunId,
-      stepRunId: input.stepRunId,
-      verdict: DecisionVerdict.APPROVE
+      stepRunId: input.stepRunId
     });
     console.log("[runtime.evaluator] evaluate.complete", {
       workflowRunId: input.workflowRunId,
@@ -536,7 +525,7 @@ export async function evaluateStepArtifact(
       finalVerdict: DecisionVerdict.APPROVE
     });
     return {
-      decisions: [humanAutoApproveDecision(input.stepRunId)],
+      decisions: [],
       finalVerdict: DecisionVerdict.APPROVE
     };
   }
@@ -557,7 +546,7 @@ export async function evaluateStepArtifact(
     input.evaluator === StepRunEvaluator.MIXED &&
     evaluatorDecision.verdict === DecisionVerdict.APPROVE
   ) {
-    console.log("[runtime.evaluator] mixed.auto_human_approve", {
+    console.log("[runtime.evaluator] mixed.defer_to_human", {
       workflowRunId: input.workflowRunId,
       stepRunId: input.stepRunId,
       evaluatorVerdict: evaluatorDecision.verdict,
@@ -569,7 +558,7 @@ export async function evaluateStepArtifact(
       finalVerdict: DecisionVerdict.APPROVE
     });
     return {
-      decisions: [evaluatorDecision, humanAutoApproveDecision(input.stepRunId)],
+      decisions: [evaluatorDecision],
       finalVerdict: DecisionVerdict.APPROVE
     };
   }

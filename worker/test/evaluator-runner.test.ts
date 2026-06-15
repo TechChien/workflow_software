@@ -100,7 +100,7 @@ function baseInput(
 }
 
 describe("evaluateStepArtifact", () => {
-  it("auto-approves human_review without starting a Codex evaluator turn", async () => {
+  it("defers human_review without starting a Codex evaluator turn", async () => {
     const gateway = new FakeGateway(() => {
       throw new Error("Codex evaluator should not run for human_review");
     });
@@ -112,14 +112,7 @@ describe("evaluateStepArtifact", () => {
 
     expect(gateway.requests).toHaveLength(0);
     expect(result).toEqual({
-      decisions: [
-        {
-          stepRunId: "step-run-1",
-          source: DecisionSource.HUMAN,
-          verdict: DecisionVerdict.APPROVE,
-          comment: "Auto-approved by the v1 human review gate."
-        }
-      ],
+      decisions: [],
       finalVerdict: DecisionVerdict.APPROVE
     });
   });
@@ -197,7 +190,7 @@ describe("evaluateStepArtifact", () => {
     expect(gateway.requests[0]?.prompt).toContain("Final report content.");
   });
 
-  it("adds the auto human approval after a mixed evaluator approval", async () => {
+  it("keeps mixed evaluator approval pending for human review", async () => {
     const gateway = new FakeGateway(() =>
       eventStream(
         agentMessage(
@@ -217,8 +210,7 @@ describe("evaluateStepArtifact", () => {
 
     expect(result.finalVerdict).toBe(DecisionVerdict.APPROVE);
     expect(result.decisions.map((decision) => decision.source)).toEqual([
-      DecisionSource.EVALUATOR,
-      DecisionSource.HUMAN
+      DecisionSource.EVALUATOR
     ]);
   });
 

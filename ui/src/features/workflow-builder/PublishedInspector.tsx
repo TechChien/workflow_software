@@ -11,7 +11,7 @@ export function PublishedInspector({
 }: {
   workflow: PublishedWorkflow;
   onCreateDraft: (workflow: PublishedWorkflow) => void;
-  onRun: (workflow: PublishedWorkflow) => void;
+  onRun: (workflow: PublishedWorkflow) => void | Promise<void>;
 }) {
   const yaml = stringifyWorkflowYaml(workflow.workflow);
 
@@ -48,7 +48,7 @@ export function PublishedInspector({
         <button type="button" onClick={() => onCreateDraft(workflow)}>
           Create Draft from Version
         </button>
-        <button type="button" className="primary" onClick={() => onRun(workflow)}>
+        <button type="button" className="primary" onClick={() => void onRun(workflow)}>
           Run
         </button>
       </div>

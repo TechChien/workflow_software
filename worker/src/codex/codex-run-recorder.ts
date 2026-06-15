@@ -3,11 +3,14 @@ import type { CodexInteractionKind } from "@workflow-software/shared";
 
 export type CodexStepRunSource = {
   stepId: string;
+  attempt: number;
   yamlSnapshot: string;
   contentHash: string;
+  revisionRequestComment?: string;
 };
 
 export type RecordedCodexEvent = {
+  attempt: number;
   sequence: number;
   externalItemId?: string;
   kind: CodexInteractionKind;

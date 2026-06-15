@@ -245,6 +245,7 @@ export type RerunStepResponse = {
 export type CodexInteractionEvent = {
   id: string;
   stepRunId: string;
+  attempt: number;
   sequence: number;
   externalItemId?: string;
   kind: string;

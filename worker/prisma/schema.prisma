@@ -181,6 +181,7 @@ model DecisionEvent {
 model CodexInteractionEvent {
   id             String   @id @default(cuid())
   stepRunId      String
+  attempt        Int      @default(1)
   sequence       Int
   externalItemId String?
   kind           String
@@ -189,8 +190,8 @@ model CodexInteractionEvent {
   createdAt      DateTime @default(now())
   stepRun        StepRun  @relation(fields: [stepRunId], references: [id])
 
-  @@unique([stepRunId, sequence])
-  @@unique([stepRunId, externalItemId])
+  @@unique([stepRunId, attempt, sequence])
+  @@unique([stepRunId, attempt, externalItemId])
 }
 
 model ContextPathEvent {

@@ -187,6 +187,15 @@ button.primary {
   color: #ffffff;
 }
 
+.button-row button.danger {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.button-row button.danger:hover:not(:disabled) {
+  background: #fef2f2;
+}
+
 .toolbar-button.primary:hover:not(:disabled),
 button.primary:hover:not(:disabled) {
   border-color: var(--teal-strong);
@@ -838,6 +847,92 @@ button.primary:hover:not(:disabled) {
 .metadata-card p {
   color: var(--muted);
   line-height: 1.45;
+}
+
+.review-card,
+.decision-card {
+  gap: 10px;
+}
+
+.criteria-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted-strong);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.review-artifacts {
+  display: grid;
+  gap: 8px;
+}
+
+.review-artifact-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.review-artifact-tabs button {
+  min-height: 28px;
+  padding: 4px 8px;
+  color: var(--muted-strong);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.review-artifact-tabs button.active {
+  border-color: var(--teal);
+  background: #f0fdfa;
+  color: var(--teal-strong);
+}
+
+.review-artifact-content {
+  max-height: 260px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 10px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: "Fira Code", Consolas, "SFMono-Regular", monospace;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.review-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.review-actions button {
+  min-width: 0;
+}
+
+.decision-list {
+  display: grid;
+  gap: 8px;
+}
+
+.decision-row {
+  display: grid;
+  gap: 5px;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+
+.decision-row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.decision-row span:not(.status-badge) {
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .timeline-panel {

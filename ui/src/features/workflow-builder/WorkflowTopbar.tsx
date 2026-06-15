@@ -8,14 +8,18 @@ import { StatusBadge, type LeftTab } from "./workbenchShared";
 export function WorkflowTopbar({
   activeTab,
   draftView,
+  isRunningWorkflow,
   onPublish,
   onRun,
+  runErrorMessage,
   selectedPublishedWorkflow
 }: {
   activeTab: LeftTab;
   draftView: DraftViewModel;
+  isRunningWorkflow?: boolean;
   onPublish: () => void | Promise<void>;
-  onRun: () => void;
+  onRun: () => void | Promise<void>;
+  runErrorMessage?: string;
   selectedPublishedWorkflow?: PublishedWorkflow;
 }) {
   const statusMessage = draftView.publishErrorMessage ?? draftView.saveErrorMessage;
@@ -26,17 +30,21 @@ export function WorkflowTopbar({
     isDraftTab && hasDraftCanvasNode && !draftView.isSavingDraft && !draftView.isPublishingDraft;
   const canPublishDraft =
     isDraftTab && hasDraftCanvasNode && !draftView.isSavingDraft && !draftView.isPublishingDraft;
-  const canRun = isPublishedTab && Boolean(selectedPublishedWorkflow);
+  const canRun = isPublishedTab && Boolean(selectedPublishedWorkflow) && !isRunningWorkflow;
   const draftActionTitle =
     !isDraftTab
       ? "Open the Draft tab to use draft actions"
       : !hasDraftCanvasNode
         ? "Add a node to the draft canvas first"
         : undefined;
-  const runActionTitle = canRun
+  const runActionTitle = runErrorMessage
+    ? `Run failed: ${runErrorMessage}`
+    : canRun
     ? "Run selected published workflow"
     : isPublishedTab
-      ? "Select a published workflow before running"
+      ? isRunningWorkflow
+        ? "Starting workflow run"
+        : "Select a published workflow before running"
       : "Open the Published tab to run a workflow";
 
   return (
@@ -109,12 +117,12 @@ export function WorkflowTopbar({
         <button
           type="button"
           className="toolbar-button primary"
-          onClick={onRun}
+          onClick={() => void onRun()}
           disabled={!canRun}
           title={runActionTitle}
         >
           <Icon name="play" />
-          Run
+          {isRunningWorkflow ? "Starting" : "Run"}
         </button>
       </div>
     </header>

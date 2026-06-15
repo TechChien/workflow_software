@@ -21,6 +21,7 @@ type StepRunStatus =
   | "READY"
   | "RUNNING"
   | "CODEX_COMPLETED"
+  | "WAITING_FOR_HUMAN_REVIEW"
   | "ACCEPTED"
   | "REJECTED"
   | "FAILED";
@@ -403,27 +404,23 @@ function createEvaluator(evaluations: EvaluateStepInput[] = []) {
   return async (input: EvaluateStepInput): Promise<EvaluateStepResult> => {
     evaluations.push(input);
 
+    if (input.evaluator === StepRunEvaluator.HUMAN_REVIEW) {
+      return {
+        decisions: [],
+        finalVerdict: DecisionVerdict.APPROVE
+      };
+    }
+
     const firstDecision: EvaluatorDecision = {
       stepRunId: input.stepRunId,
-      source:
-        input.evaluator === StepRunEvaluator.HUMAN_REVIEW
-          ? DecisionSource.HUMAN
-          : DecisionSource.EVALUATOR,
+      source: DecisionSource.EVALUATOR,
       verdict: DecisionVerdict.APPROVE,
       comment: "Approved."
     };
 
     if (input.evaluator === StepRunEvaluator.MIXED) {
       return {
-        decisions: [
-          firstDecision,
-          {
-            stepRunId: input.stepRunId,
-            source: DecisionSource.HUMAN,
-            verdict: DecisionVerdict.APPROVE,
-            comment: "Auto-approved."
-          }
-        ],
+        decisions: [firstDecision],
         finalVerdict: DecisionVerdict.APPROVE
       };
     }
@@ -463,7 +460,7 @@ describe("runNextReadyStep", () => {
     await expect(runNextReadyStep(dependencies(db))).resolves.toEqual({ picked: false });
   });
 
-  it("executes agent + MIXED, records approval, accepts the step, and readies downstream", async () => {
+  it("executes agent + MIXED, records evaluator approval, and waits for human review", async () => {
     const db = new FakeRuntimeDb([
       {
         id: "step-1",
@@ -487,7 +484,7 @@ describe("runNextReadyStep", () => {
       })
     );
 
-    expect(result).toMatchObject({ picked: true, outcome: "accepted" });
+    expect(result).toMatchObject({ picked: true, outcome: "waiting_for_human_review" });
     expect(executions).toEqual([
       {
         stepRunId: "step-run-step-1",
@@ -505,16 +502,12 @@ describe("runNextReadyStep", () => {
         codexFinalResponse: "Codex finished successfully."
       }
     ]);
-    expect(db.requireStepRun("step-run-step-1").status).toBe("ACCEPTED");
-    expect(db.requireStepRun("step-run-step-2").status).toBe("READY");
-    expect(db.workflowRun.status).toBe("RUNNING");
+    expect(db.requireStepRun("step-run-step-1").status).toBe("WAITING_FOR_HUMAN_REVIEW");
+    expect(db.requireStepRun("step-run-step-2").status).toBe("PENDING");
+    expect(db.workflowRun.status).toBe("WAITING");
     expect(db.decisionEvents).toMatchObject([
       {
         source: DecisionSource.EVALUATOR,
-        verdict: DecisionVerdict.APPROVE
-      },
-      {
-        source: DecisionSource.HUMAN,
         verdict: DecisionVerdict.APPROVE
       }
     ]);
@@ -525,7 +518,7 @@ describe("runNextReadyStep", () => {
       {
         id: "step-1",
         type: "agent",
-        evaluator: StepRunEvaluator.MIXED
+        evaluator: StepRunEvaluator.EVALUATOR_REVIEW
       },
       {
         id: "step-2",
@@ -557,12 +550,12 @@ describe("runNextReadyStep", () => {
       {
         id: "step-1",
         type: "agent",
-        evaluator: StepRunEvaluator.MIXED
+        evaluator: StepRunEvaluator.EVALUATOR_REVIEW
       },
       {
         id: "step-2",
         type: "agent",
-        evaluator: StepRunEvaluator.MIXED
+        evaluator: StepRunEvaluator.EVALUATOR_REVIEW
       },
       {
         id: "step-3",
@@ -596,7 +589,7 @@ describe("runNextReadyStep", () => {
       {
         id: "step-1",
         type: "agent",
-        evaluator: StepRunEvaluator.MIXED
+        evaluator: StepRunEvaluator.EVALUATOR_REVIEW
       }
     ]);
     const executions: ExecuteStepRunWithCodexInput[] = [];
@@ -630,7 +623,7 @@ describe("runNextReadyStep", () => {
     expect(db.decisionEvents[0]?.source).toBe(DecisionSource.EVALUATOR);
   });
 
-  it("executes code_agent + HUMAN_REVIEW through the human approval path and advances downstream", async () => {
+  it("executes code_agent + HUMAN_REVIEW and waits before advancing downstream", async () => {
     const db = new FakeRuntimeDb([
       {
         id: "step-1",
@@ -647,11 +640,12 @@ describe("runNextReadyStep", () => {
 
     await expect(runNextReadyStep(dependencies(db))).resolves.toMatchObject({
       picked: true,
-      outcome: "accepted"
+      outcome: "waiting_for_human_review"
     });
-    expect(db.requireStepRun("step-run-step-1").status).toBe("ACCEPTED");
-    expect(db.requireStepRun("step-run-step-2").status).toBe("READY");
-    expect(db.decisionEvents[0]?.source).toBe(DecisionSource.HUMAN);
+    expect(db.requireStepRun("step-run-step-1").status).toBe("WAITING_FOR_HUMAN_REVIEW");
+    expect(db.requireStepRun("step-run-step-2").status).toBe("PENDING");
+    expect(db.workflowRun.status).toBe("WAITING");
+    expect(db.decisionEvents).toHaveLength(0);
   });
 
   it("marks the workflow run completed after final step approval", async () => {
@@ -659,7 +653,7 @@ describe("runNextReadyStep", () => {
       {
         id: "step-1",
         type: "agent",
-        evaluator: StepRunEvaluator.MIXED
+        evaluator: StepRunEvaluator.EVALUATOR_REVIEW
       }
     ]);
 

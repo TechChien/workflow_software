@@ -64,7 +64,11 @@ export const workflowRunDetailInclude = {
         orderBy: createdOrder
       },
       codexInteractions: {
-        orderBy: [{ sequence: "asc" as const }, { id: "asc" as const }]
+        orderBy: [
+          { attempt: "asc" as const },
+          { sequence: "asc" as const },
+          { id: "asc" as const }
+        ]
       },
       codeChangeRecords: {
         orderBy: createdOrder
@@ -137,7 +141,11 @@ export const stepRunDetailInclude = {
     orderBy: createdOrder
   },
   codexInteractions: {
-    orderBy: [{ sequence: "asc" as const }, { id: "asc" as const }]
+    orderBy: [
+      { attempt: "asc" as const },
+      { sequence: "asc" as const },
+      { id: "asc" as const }
+    ]
   },
   codeChangeRecords: {
     orderBy: createdOrder
@@ -480,6 +488,7 @@ function serializeContextPathEvent(event: {
 function serializeCodexInteractionEvent(event: {
   id: string;
   stepRunId: string;
+  attempt: number;
   sequence: number;
   externalItemId: string | null;
   kind: string;
@@ -490,6 +499,7 @@ function serializeCodexInteractionEvent(event: {
   return {
     id: event.id,
     stepRunId: event.stepRunId,
+    attempt: event.attempt,
     sequence: event.sequence,
     externalItemId: event.externalItemId ?? undefined,
     kind: event.kind,

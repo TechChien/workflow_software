@@ -136,7 +136,7 @@ async function loadCompletedStepRun(stepRunId: string) {
     where: { id: stepRunId },
     include: {
       codexInteractions: {
-        orderBy: { sequence: "asc" }
+        orderBy: [{ attempt: "asc" }, { sequence: "asc" }]
       }
     }
   });

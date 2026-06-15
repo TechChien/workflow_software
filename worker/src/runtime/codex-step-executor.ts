@@ -36,6 +36,10 @@ export type CodexExecutionResult = {
   usage: Usage;
 };
 
+export type CodexRuntimePromptOptions = {
+  revisionRequestComment?: string;
+};
+
 export class CodexExecutionError extends Error {
   constructor(
     readonly code: string,
@@ -100,11 +104,13 @@ function formatAcceptanceCriteria(criteria: string[]) {
 export function buildCodexRuntimePrompt(
   prompt: string,
   acceptanceCriteria: string[] = [],
-  context: CodexRuntimePromptContext | undefined = undefined
+  context: CodexRuntimePromptContext | undefined = undefined,
+  options: CodexRuntimePromptOptions = {}
 ) {
   const hasAcceptanceCriteria = acceptanceCriteria.length > 0;
+  const revisionRequestComment = options.revisionRequestComment?.trim();
 
-  if (!hasRuntimeContext(context) && !hasAcceptanceCriteria) {
+  if (!hasRuntimeContext(context) && !hasAcceptanceCriteria && !revisionRequestComment) {
     return prompt;
   }
 
@@ -157,6 +163,17 @@ export function buildCodexRuntimePrompt(
       formatAcceptanceCriteria(acceptanceCriteria),
       "",
       "Complete the step so the finished work satisfies every acceptance criterion.",
+      ""
+    );
+  }
+
+  if (revisionRequestComment) {
+    sections.push(
+      "## Human Revision Request",
+      "",
+      "A human reviewer requested changes to the previous attempt. Address this comment while still satisfying the original step prompt and acceptance criteria.",
+      "",
+      revisionRequestComment,
       ""
     );
   }
@@ -279,6 +296,7 @@ function failureFromTerminalEvent(event: ThreadEvent): CodexExecutionError | und
 async function persistFailure(
   recorder: CodexRunRecorder,
   stepRunId: string,
+  attempt: number,
   sequence: number,
   error: CodexExecutionError
 ) {
@@ -290,6 +308,7 @@ async function persistFailure(
   try {
     if (!error.eventRecorded) {
       await recorder.appendEvent(stepRunId, {
+        attempt,
         sequence,
         kind: "error",
         status: "failed",
@@ -343,7 +362,8 @@ export async function executeStepRunWithCodexCore(
   const prompt = buildCodexRuntimePrompt(
     workflowPrompt,
     acceptanceCriteria,
-    input.runtimeContext
+    input.runtimeContext,
+    { revisionRequestComment: source.revisionRequestComment }
   );
   const threadOptions = buildCodexThreadOptions(input.workingDirectory, dependencies.settings, {
     additionalDirectories: buildCodexAdditionalDirectories(input.runtimeContext)
@@ -418,6 +438,7 @@ export async function executeStepRunWithCodexCore(
           externalItemId: normalized.externalItemId,
         });
         await dependencies.recorder.appendEvent(input.stepRunId, {
+          attempt: source.attempt,
           sequence,
           ...normalized
         });
@@ -494,7 +515,13 @@ export async function executeStepRunWithCodexCore(
       message: executionError.message,
       eventRecorded: executionError.eventRecorded,
     });
-    await persistFailure(dependencies.recorder, input.stepRunId, sequence + 1, executionError);
+    await persistFailure(
+      dependencies.recorder,
+      input.stepRunId,
+      source.attempt,
+      sequence + 1,
+      executionError
+    );
     throw executionError;
   } finally {
     abortState.dispose();

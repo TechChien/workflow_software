@@ -1,18 +1,32 @@
 "use client";
 
 import {
+  Check,
   CircleQuestionMark,
   PanelLeftClose,
   PanelLeftOpen,
   Play,
   Plus,
+  RotateCcw,
   Save,
   Trash2,
   Upload,
+  XCircle,
   type LucideIcon
 } from "lucide-react";
 
-export type IconName = "save" | "upload" | "play" | "panel" | "collapse" | "trash" | "plus" | "help";
+export type IconName =
+  | "save"
+  | "upload"
+  | "play"
+  | "panel"
+  | "collapse"
+  | "trash"
+  | "plus"
+  | "help"
+  | "check"
+  | "revision"
+  | "reject";
 
 const icons: Record<IconName, LucideIcon> = {
   save: Save,
@@ -22,7 +36,10 @@ const icons: Record<IconName, LucideIcon> = {
   collapse: PanelLeftClose,
   trash: Trash2,
   plus: Plus,
-  help: CircleQuestionMark
+  help: CircleQuestionMark,
+  check: Check,
+  revision: RotateCcw,
+  reject: XCircle
 };
 
 export function Icon({ name }: { name: IconName }) {

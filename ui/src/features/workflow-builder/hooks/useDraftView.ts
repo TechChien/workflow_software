@@ -322,20 +322,17 @@ export function useDraftView(): DraftViewModel {
         return;
       }
 
-      setDraftEdges((edges) => {
-        const prunedEdges = edges.filter(
-          (edge) => edge.source !== connection.source && edge.target !== connection.target
-        );
-        return addEdge(
+      setDraftEdges((edges) =>
+        addEdge(
           {
             ...connection,
             id: `${connection.source}-${connection.target}`,
             type: "smoothstep",
             markerEnd: { type: MarkerType.ArrowClosed }
           },
-          prunedEdges
-        );
-      });
+          edges
+        )
+      );
       setIsDirty(true);
     },
     [setDraftEdges]

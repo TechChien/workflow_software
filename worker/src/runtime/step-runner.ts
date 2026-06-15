@@ -2,8 +2,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   DecisionVerdict,
+  StepRunEvaluator,
   type Prisma,
-  type StepRunEvaluator,
 } from "../generated/prisma/client.js";
 import {
   directDependentStepIds,
@@ -35,7 +35,7 @@ export type StepRunnerResult =
       picked: true;
       stepRunId: string;
       workflowRunId: string;
-      outcome: "accepted" | "failed" | "race_lost";
+      outcome: "accepted" | "failed" | "race_lost" | "waiting_for_human_review";
     };
 
 type ReadyStepRun = {
@@ -200,6 +200,28 @@ async function markWorkflowRunFailed(
   });
 }
 
+async function markWorkflowRunWaiting(
+  client: StepRunnerClient,
+  workflowRunId: string,
+) {
+  const result = await client.workflowRun.updateMany({
+    where: {
+      id: workflowRunId,
+      status: "RUNNING",
+    },
+    data: {
+      status: "WAITING",
+      completedAt: null,
+    },
+  });
+  console.log("[runtime.step-runner] workflow.status", {
+    workflowRunId,
+    from: "RUNNING",
+    to: "WAITING",
+    updated: result.count,
+  });
+}
+
 async function markStepRunFailed(
   client: StepRunnerClient,
   stepRunId: string,
@@ -235,6 +257,32 @@ async function markStepRunFailed(
     stepRunId,
     from: current.status,
     to: "FAILED",
+  });
+}
+
+async function markStepRunWaitingForHumanReview(
+  client: StepRunnerClient,
+  stepRunId: string,
+) {
+  const result = await client.stepRun.updateMany({
+    where: {
+      id: stepRunId,
+      status: "CODEX_COMPLETED",
+    },
+    data: {
+      status: "WAITING_FOR_HUMAN_REVIEW",
+      completedAt: null,
+    },
+  });
+
+  if (result.count !== 1) {
+    throw new Error(`StepRun ${stepRunId} was not CODEX_COMPLETED`);
+  }
+  console.log("[runtime.step-runner] step.status", {
+    stepRunId,
+    from: "CODEX_COMPLETED",
+    to: "WAITING_FOR_HUMAN_REVIEW",
+    updated: result.count,
   });
 }
 
@@ -411,6 +459,10 @@ function allWorkflowStepsAccepted(
   statuses: Map<string, string>,
 ) {
   return workflow.steps.every((step) => statuses.get(step.id) === "ACCEPTED");
+}
+
+function shouldWaitForHumanReview(evaluator: StepRunEvaluator) {
+  return evaluator === StepRunEvaluator.HUMAN_REVIEW || evaluator === StepRunEvaluator.MIXED;
 }
 
 async function readyEligibleDependentSteps(
@@ -753,6 +805,22 @@ export async function runNextReadyStep(
       return {
         ...resultBase,
         outcome: "failed",
+      };
+    }
+
+    if (shouldWaitForHumanReview(stepRun.evaluator)) {
+      console.log("[runtime.step-runner] step.waiting_for_human_review", {
+        workflowRunId: stepRun.workflowRunId,
+        stepRunId: stepRun.id,
+        stepId: step.id,
+        evaluator: stepRun.evaluator,
+      });
+      await markStepRunWaitingForHumanReview(client, stepRun.id);
+      await markWorkflowRunWaiting(client, stepRun.workflowRunId);
+
+      return {
+        ...resultBase,
+        outcome: "waiting_for_human_review",
       };
     }
 

@@ -254,7 +254,7 @@ describeIntegration("workspace integration", () => {
               where: { id: stepRunId },
               include: {
                 codexInteractions: {
-                  orderBy: { sequence: "asc" }
+                  orderBy: [{ attempt: "asc" }, { sequence: "asc" }]
                 }
               }
             });
