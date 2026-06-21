@@ -141,6 +141,7 @@ pnpm typecheck
 - Each node has at most one upstream node and one downstream node.
 - Each step can consume multiple artifact inputs and produce multiple artifacts.
 - Each step can define multiple acceptance criteria.
+- `step.evaluate.rerun` opts a step into checkpointed reruns after rejected artifacts.
 - Artifacts are immutable; reruns create new versions.
 - Downstream step runs record the exact artifact versions they consumed.
 - Optional context paths are worktree-relative and skipped when missing or inaccessible.

@@ -14,7 +14,13 @@ function client(overrides: Partial<StepRunnerRepositoryClient> = {}) {
     workflowRun: {
       updateMany: vi.fn(async () => ({ count: 1 }))
     },
+    artifactVersion: {
+      updateMany: vi.fn(async () => ({ count: 1 }))
+    },
     decisionEvent: {
+      create: vi.fn(async () => ({}))
+    },
+    runEvent: {
       create: vi.fn(async () => ({}))
     },
     ...overrides
@@ -77,5 +83,55 @@ describe("PrismaStepRunnerRepository", () => {
     await expect(
       repository.markStepRunAccepted("step-run-1", new Date(Date.UTC(2026, 0, 2)))
     ).rejects.toThrow("StepRun step-run-1 was not CODEX_COMPLETED");
+  });
+
+  it("queues a rejected step for rerun and supersedes candidate artifacts", async () => {
+    const db = client();
+    const repository = new PrismaStepRunnerRepository(db);
+
+    await repository.queueStepRunRerun({
+      workflowRunId: "workflow-run-1",
+      stepRunId: "step-run-1",
+      reason: "evaluator_rejected",
+      comment: "Needs evidence.",
+      resetToBeforeCommit: true
+    });
+
+    expect(db.artifactVersion.updateMany).toHaveBeenCalledWith({
+      where: {
+        producerStepRunId: "step-run-1",
+        status: "CANDIDATE"
+      },
+      data: {
+        status: "SUPERSEDED"
+      }
+    });
+    expect(db.stepRun.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: "step-run-1",
+          status: "CODEX_COMPLETED"
+        },
+        data: expect.objectContaining({
+          attempt: {
+            increment: 1
+          },
+          status: "READY",
+          codexThreadId: null
+        })
+      })
+    );
+    expect(db.runEvent.create).toHaveBeenCalledWith({
+      data: {
+        workflowRunId: "workflow-run-1",
+        eventType: "step_run.rerun_requested",
+        payload: {
+          stepRunId: "step-run-1",
+          reason: "evaluator_rejected",
+          comment: "Needs evidence.",
+          resetToBeforeCommit: true
+        }
+      }
+    });
   });
 });

@@ -50,6 +50,7 @@ describe("canonicalizeWorkflowDefinition", () => {
     const snapshot = canonicalizeWorkflowDefinition(baseWorkflow({ type: "agent" }));
 
     expect(snapshot.definition.steps[0]?.evaluate.evaluator).toBe("mixed");
+    expect(snapshot.definition.steps[0]?.evaluate.rerun).toBe(false);
   });
 
   it("accepts explicit evaluator settings", () => {
@@ -61,6 +62,21 @@ describe("canonicalizeWorkflowDefinition", () => {
     );
 
     expect(snapshot.definition.steps[0]?.evaluate.evaluator).toBe("human_review");
+    expect(snapshot.definition.steps[0]?.evaluate.rerun).toBe(false);
+  });
+
+  it("accepts explicit rerun settings", () => {
+    const snapshot = canonicalizeWorkflowDefinition(
+      baseWorkflow({
+        type: "code_agent",
+        evaluate: { evaluator: "human_review", rerun: true }
+      })
+    );
+
+    expect(snapshot.definition.steps[0]?.evaluate).toEqual({
+      evaluator: "human_review",
+      rerun: true
+    });
   });
 
   it("falls back to mixed for invalid evaluator settings", () => {

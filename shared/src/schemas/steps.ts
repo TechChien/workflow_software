@@ -21,10 +21,11 @@ export const AcceptanceCriteriaSchema = z
 
 export const StepEvaluateSchema = z
   .object({
-    evaluator: z.enum(STEP_RUN_EVALUATORS).catch("mixed").default("mixed")
+    evaluator: z.enum(STEP_RUN_EVALUATORS).catch("mixed").default("mixed"),
+    rerun: z.boolean().catch(false).default(false)
   })
-  .catch({ evaluator: "mixed" })
-  .default({ evaluator: "mixed" });
+  .catch({ evaluator: "mixed", rerun: false })
+  .default({ evaluator: "mixed", rerun: false });
 
 const StepDefinitionBaseSchema = z.object({
   id: z.string().min(1),

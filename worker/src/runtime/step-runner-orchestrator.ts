@@ -9,6 +9,7 @@ import { StepRunnerErrorHandler, extractCodexFinalResponse } from "./step-runner
 import type { StepRunnerRepository } from "./step-runner-repository.js";
 import type { StepRunnerResult } from "./step-runner.js";
 import type { StepArtifactRuntime } from "./step-artifact-runtime.js";
+import type { StepCheckpointRuntime } from "./step-checkpoint-runtime.js";
 import type { WorkspaceResolver } from "./workspace-resolver.js";
 import {
   allWorkflowStepsAccepted,
@@ -23,9 +24,28 @@ export type StepRunnerOrchestratorDependencies = {
   evaluateStep: (input: EvaluateStepInput) => Promise<EvaluateStepResult>;
   workspaceResolver: WorkspaceResolver;
   artifactRuntime: StepArtifactRuntime;
+  checkpointRuntime: StepCheckpointRuntime;
   resolveArtifactStoreRoot: () => string | Promise<string>;
   now: () => Date;
 };
+
+const MAX_AUTOMATIC_RERUN_ATTEMPTS = 2;
+
+function latestDecisionComment(evaluation: EvaluateStepResult) {
+  for (const decision of [...evaluation.decisions].reverse()) {
+    const comment = decision.comment?.trim();
+
+    if (comment) {
+      return comment;
+    }
+  }
+
+  return undefined;
+}
+
+function approvedStepCommitMessage(stepId: string, stepRunId: string) {
+  return `Approve workflow step ${stepId} (${stepRunId})`;
+}
 
 export class StepRunnerOrchestrator {
   private readonly errorHandler: StepRunnerErrorHandler;
@@ -101,6 +121,16 @@ export class StepRunnerOrchestrator {
         workflowRunId: stepRun.workflowRunId,
         stepRunId: stepRun.id,
         workingDirectory
+      });
+      const beforeCommit = await this.dependencies.checkpointRuntime.recordBefore({
+        stepRunId: stepRun.id,
+        codeWorkspaceId: stepRun.codeWorkspaceId,
+        workingDirectory
+      });
+      console.log("[runtime.step-runner] checkpoint.before_commit", {
+        workflowRunId: stepRun.workflowRunId,
+        stepRunId: stepRun.id,
+        beforeCommit
       });
       const artifactStoreRoot = await this.dependencies.resolveArtifactStoreRoot();
       console.log("[runtime.step-runner] artifact_store.ready", {
@@ -198,11 +228,43 @@ export class StepRunnerOrchestrator {
           workflowRunId: stepRun.workflowRunId,
           stepRunId: stepRun.id,
           stepId: step.id,
-          finalVerdict: evaluation.finalVerdict
+          finalVerdict: evaluation.finalVerdict,
+          rerun: step.evaluate.rerun,
+          attempt: stepRun.attempt
         });
+        if (
+          step.evaluate.rerun &&
+          stepRun.attempt < MAX_AUTOMATIC_RERUN_ATTEMPTS
+        ) {
+          const resetToBeforeCommit =
+            await this.dependencies.checkpointRuntime.resetBeforeRerun({
+              stepRunId: stepRun.id,
+              codeWorkspaceId: stepRun.codeWorkspaceId,
+              workingDirectory,
+              beforeCommit
+            });
+          await this.dependencies.repository.queueStepRunRerun({
+            workflowRunId: stepRun.workflowRunId,
+            stepRunId: stepRun.id,
+            reason: "evaluator_rejected",
+            comment: latestDecisionComment(evaluation),
+            resetToBeforeCommit
+          });
+
+          return {
+            ...resultBase,
+            outcome: "rerun_queued"
+          };
+        }
+
         await this.dependencies.artifactRuntime.rejectProduced({
           session: artifactSession,
           stepRunId: stepRun.id
+        });
+        await this.dependencies.checkpointRuntime.markRejected({
+          stepRunId: stepRun.id,
+          codeWorkspaceId: stepRun.codeWorkspaceId,
+          beforeCommit
         });
 
         const rejectionTime = this.dependencies.now();
@@ -246,6 +308,13 @@ export class StepRunnerOrchestrator {
         stepRunId: stepRun.id,
         stepId: step.id,
         finalVerdict: evaluation.finalVerdict
+      });
+      await this.dependencies.checkpointRuntime.commitApproved({
+        stepRunId: stepRun.id,
+        codeWorkspaceId: stepRun.codeWorkspaceId,
+        workingDirectory,
+        beforeCommit,
+        message: approvedStepCommitMessage(step.id, stepRun.id)
       });
       await this.dependencies.artifactRuntime.acceptProduced({
         session: artifactSession,

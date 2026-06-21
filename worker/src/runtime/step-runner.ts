@@ -19,6 +19,11 @@ import {
   type StepArtifactRuntime,
   type StepArtifactRuntimeClient
 } from "./step-artifact-runtime.js";
+import {
+  DefaultStepCheckpointRuntime,
+  type StepCheckpointRuntime,
+  type StepCheckpointRuntimeClient
+} from "./step-checkpoint-runtime.js";
 import { StepRunnerOrchestrator } from "./step-runner-orchestrator.js";
 import {
   FunctionWorkspaceResolver,
@@ -34,12 +39,18 @@ export type StepRunnerResult =
       picked: true;
       stepRunId: string;
       workflowRunId: string;
-      outcome: "accepted" | "failed" | "race_lost" | "waiting_for_human_review";
+      outcome:
+        | "accepted"
+        | "failed"
+        | "race_lost"
+        | "rerun_queued"
+        | "waiting_for_human_review";
     };
 
 export type StepRunnerClient = StepRunnerRepositoryClient &
   WorkspaceResolverClient &
-  StepArtifactRuntimeClient;
+  StepArtifactRuntimeClient &
+  StepCheckpointRuntimeClient;
 
 export type { StepWorkingDirectoryInput };
 
@@ -47,6 +58,7 @@ export type StepRunnerDependencies = {
   client?: StepRunnerClient;
   repository?: StepRunnerRepository;
   artifactRuntime?: StepArtifactRuntime;
+  checkpointRuntime?: StepCheckpointRuntime;
   workspaceResolver?: WorkspaceResolver;
   executeStepRun?: (input: ExecuteStepRunWithCodexInput) => Promise<unknown>;
   evaluateStep?: (input: EvaluateStepInput) => Promise<EvaluateStepResult>;
@@ -95,6 +107,8 @@ export async function runNextReadyStep(
     workspaceResolver: resolveWorkspaceResolver(client, dependencies),
     artifactRuntime:
       dependencies.artifactRuntime ?? new DefaultStepArtifactRuntime(client),
+    checkpointRuntime:
+      dependencies.checkpointRuntime ?? new DefaultStepCheckpointRuntime(client),
     resolveArtifactStoreRoot:
       dependencies.resolveArtifactStoreRoot ?? defaultArtifactStoreRoot,
     now: dependencies.now ?? (() => new Date())

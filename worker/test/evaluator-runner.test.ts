@@ -73,7 +73,7 @@ function baseStep(overrides: Partial<StepDefinition> = {}): StepDefinition {
     output_artifacts: [],
     context_paths: [],
     tool_capabilities: [],
-    evaluate: { evaluator: "mixed" },
+    evaluate: { evaluator: "mixed", rerun: false },
     prompt: "Write the release summary.",
     acceptance: {
       criteria: ["The summary mentions shipped features."]

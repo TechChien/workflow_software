@@ -23,7 +23,7 @@ function workflowWithDependencies(
       output_artifacts: [],
       context_paths: [],
       tool_capabilities: [],
-      evaluate: { evaluator: "mixed" },
+      evaluate: { evaluator: "mixed", rerun: false },
       prompt: `Run ${id}.`,
       acceptance: { criteria: [] }
     })),

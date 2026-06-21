@@ -27,6 +27,7 @@ steps:
     type: code_agent
     evaluate:
       evaluator: human_review
+      rerun: true
     depends_on:
       - g1_intent_freeze
     input_artifacts:
@@ -51,6 +52,7 @@ steps:
     type: code_agent
     evaluate:
       evaluator: human_review
+      rerun: true
     depends_on:
       - g1_intent_freeze
     input_artifacts:

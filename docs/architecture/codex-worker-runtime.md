@@ -42,6 +42,23 @@ When all declared outputs exist, the runner writes `ArtifactVersion` rows as
 `CANDIDATE`; after the evaluator approves, those versions become `ACCEPTED` and
 can be consumed by downstream `input_artifacts`.
 
+## Checkpointed reruns
+
+Before each Codex turn, the worker records the worktree `HEAD` in
+`StepRun.beforeCommit` and creates a candidate `CodeChangeRecord`. If a step
+sets `evaluate.rerun: true` and its artifacts are rejected, the worker resets the
+dedicated worktree to `beforeCommit`, marks candidate artifacts as `SUPERSEDED`,
+increments `StepRun.attempt`, and queues the same step as `READY`.
+
+Human `request_revision` decisions always use the checkpointed rerun path.
+Human `reject` decisions use it only when `evaluate.rerun` is true. Evaluator
+reject/request-revision results use it only when `evaluate.rerun` is true, with a
+single automatic retry guard to avoid uncontrolled loops.
+
+When a step is finally accepted, source changes are committed in the dedicated
+worktree and `StepRun.afterCommit` is recorded. Runtime files under
+`.workflow-runtime` are excluded from approved source commits.
+
 ## SDK usage
 
 The worker pins `@openai/codex-sdk` to `0.136.0`. The SDK starts the bundled Codex

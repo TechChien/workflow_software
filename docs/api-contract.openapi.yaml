@@ -756,10 +756,14 @@ components:
           default: []
         evaluate:
           type: object
-          required: [evaluator]
+          required: [evaluator, rerun]
           properties:
             evaluator:
               $ref: "#/components/schemas/StepRunEvaluator"
+            rerun:
+              type: boolean
+              default: false
+              description: Rerun this step when produced artifacts are rejected.
         prompt:
           type: string
           default: ""

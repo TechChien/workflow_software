@@ -169,9 +169,9 @@ export function buildCodexRuntimePrompt(
 
   if (revisionRequestComment) {
     sections.push(
-      "## Human Revision Request",
+      "## Review Feedback",
       "",
-      "A human reviewer requested changes to the previous attempt. Address this comment while still satisfying the original step prompt and acceptance criteria.",
+      "A reviewer rejected or requested changes to the previous attempt. Address this feedback while still satisfying the original step prompt and acceptance criteria.",
       "",
       revisionRequestComment,
       ""

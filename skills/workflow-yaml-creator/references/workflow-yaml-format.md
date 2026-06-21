@@ -31,6 +31,7 @@ Use this structure for each step unless the existing workflow establishes a diff
   type: agent
   evaluate:
     evaluator: mixed
+    rerun: false
   depends_on:
     - previous_step_id
   input_artifacts:
@@ -54,6 +55,7 @@ Use this structure for each step unless the existing workflow establishes a diff
 - `id`: Unique lowercase snake_case step id.
 - `type`: Use `agent` for reasoning, writing, review, synthesis, and planning. Use `code_agent` for repository inspection, code edits, tests, and implementation work.
 - `evaluate.evaluator`: Use `mixed` by default. Use `human_review` when evidence, judgment, or approval is important.
+- `evaluate.rerun`: Boolean. Use `true` only when rejected artifacts should trigger a checkpointed rerun of the same step.
 - `depends_on`: List of prerequisite step ids. Use `[]` when there are no prerequisites.
 - `input_artifacts`: List of artifact objects produced by prior steps. Use `[]` when there are no input artifacts.
 - `output_artifacts`: List of preserved outputs with `artifact` and `filename`.
@@ -126,6 +128,7 @@ steps:
     type: code_agent
     evaluate:
       evaluator: human_review
+      rerun: true
     depends_on:
       - g1_intent_freeze
     input_artifacts:
@@ -150,6 +153,7 @@ steps:
     type: code_agent
     evaluate:
       evaluator: human_review
+      rerun: true
     depends_on:
       - g1_intent_freeze
     input_artifacts:

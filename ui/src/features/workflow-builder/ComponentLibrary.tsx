@@ -25,7 +25,7 @@ export const componentTemplates: ComponentTemplate[] = [
       output_artifacts: [],
       context_paths: [],
       tool_capabilities: ["*"],
-      evaluate: { evaluator: "mixed" },
+      evaluate: { evaluator: "mixed", rerun: false },
       prompt: "Describe the task this agent should complete.",
       acceptance: { criteria: [] }
     }
@@ -43,7 +43,7 @@ export const componentTemplates: ComponentTemplate[] = [
       output_artifacts: [],
       context_paths: [],
       tool_capabilities: ["*"],
-      evaluate: { evaluator: "mixed" },
+      evaluate: { evaluator: "mixed", rerun: false },
       prompt: "Inspect the workspace context and produce the requested code change summary.",
       acceptance: { criteria: [] }
     }

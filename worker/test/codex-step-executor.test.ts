@@ -53,6 +53,7 @@ function sourceFor(
         prompt,
         evaluate: {
           evaluator: "mixed",
+          rerun: false
         },
         acceptance: { criteria: acceptanceCriteria }
       }
@@ -307,7 +308,7 @@ describe("executeStepRunWithCodexCore", () => {
       dependencies(recorder, gateway)
     );
 
-    expect(gateway.requests[0]?.prompt).toContain("## Human Revision Request");
+    expect(gateway.requests[0]?.prompt).toContain("## Review Feedback");
     expect(gateway.requests[0]?.prompt).toContain(
       "Mention the rollback risk before approval."
     );

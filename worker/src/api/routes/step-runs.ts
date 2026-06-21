@@ -56,15 +56,28 @@ export async function registerStepRunRoutes(app: FastifyInstance) {
       throw notFound(`StepRun ${stepRunId} was not found`);
     }
 
-    if (body.resetToBeforeCommit && stepRun.beforeCommit && stepRun.codeWorkspaceId) {
+    if (body.resetToBeforeCommit) {
+      if (!stepRun.beforeCommit || !stepRun.codeWorkspaceId) {
+        throw badRequest("StepRun cannot rerun without a recorded checkpoint", {
+          stepRunId,
+          hasBeforeCommit: Boolean(stepRun.beforeCommit),
+          hasCodeWorkspace: Boolean(stepRun.codeWorkspaceId)
+        });
+      }
+
       const workspace = await prisma.codeWorkspace.findUnique({
         where: { id: stepRun.codeWorkspaceId },
         select: { worktreePath: true }
       });
 
-      if (workspace) {
-        await resetToCommit(workspace.worktreePath, stepRun.beforeCommit);
+      if (!workspace) {
+        throw badRequest("StepRun cannot rerun because its code workspace was not found", {
+          stepRunId,
+          codeWorkspaceId: stepRun.codeWorkspaceId
+        });
       }
+
+      await resetToCommit(workspace.worktreePath, stepRun.beforeCommit);
     }
 
     const now = new Date();
@@ -102,6 +115,19 @@ export async function registerStepRunRoutes(app: FastifyInstance) {
           status: "SUPERSEDED"
         }
       });
+      if (body.resetToBeforeCommit && stepRun.beforeCommit && stepRun.codeWorkspaceId) {
+        await db.codeChangeRecord.updateMany({
+          where: {
+            stepRunId,
+            codeWorkspaceId: stepRun.codeWorkspaceId,
+            beforeCommit: stepRun.beforeCommit,
+            status: "candidate"
+          },
+          data: {
+            status: "reverted"
+          }
+        });
+      }
       await db.stepRun.update({
         where: { id: stepRunId },
         data: {
@@ -109,6 +135,9 @@ export async function registerStepRunRoutes(app: FastifyInstance) {
             increment: 1
           },
           status: "READY",
+          codexThreadId: null,
+          promptSnapshot: null,
+          codexOptions: {},
           startedAt: null,
           completedAt: null,
           codexFinalResponse: null,

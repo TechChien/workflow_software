@@ -1,4 +1,4 @@
-import { StepRunEvaluator, type Prisma } from "../generated/prisma/client.js";
+import { Prisma, StepRunEvaluator } from "../generated/prisma/client.js";
 import type { EvaluatorDecision } from "./evaluator-runner.js";
 import { serializeError } from "./step-runner-errors.js";
 import type { WorkflowStepRunStatus } from "./workflow-progression.js";
@@ -7,8 +7,10 @@ export type ReadyStepRun = {
   id: string;
   workflowRunId: string;
   stepId: string;
+  attempt: number;
   evaluator: StepRunEvaluator;
   codeWorkspaceId: string | null;
+  beforeCommit: string | null;
   workflowRun: {
     workflowVersion: {
       workflowId: string;
@@ -38,8 +40,16 @@ export type StepRunnerRepositoryClient = {
       args: Prisma.WorkflowRunUpdateManyArgs
     ): PromiseLike<{ count: number }>;
   };
+  artifactVersion: {
+    updateMany(
+      args: Prisma.ArtifactVersionUpdateManyArgs
+    ): PromiseLike<{ count: number }>;
+  };
   decisionEvent: {
     create(args: Prisma.DecisionEventCreateArgs): PromiseLike<unknown>;
+  };
+  runEvent: {
+    create(args: Prisma.RunEventCreateArgs): PromiseLike<unknown>;
   };
 };
 
@@ -57,6 +67,13 @@ export type StepRunnerRepository = {
   markStepRunWaitingForHumanReview(stepRunId: string): Promise<void>;
   markStepRunAccepted(stepRunId: string, now: Date): Promise<void>;
   markStepRunRejected(stepRunId: string, now: Date): Promise<void>;
+  queueStepRunRerun(input: {
+    workflowRunId: string;
+    stepRunId: string;
+    reason: string;
+    comment?: string;
+    resetToBeforeCommit: boolean;
+  }): Promise<void>;
   persistDecisions(input: {
     workflowRunId: string;
     stepRunId: string;
@@ -279,6 +296,80 @@ export class PrismaStepRunnerRepository implements StepRunnerRepository {
       from: "CODEX_COMPLETED",
       to: "REJECTED",
       updated: result.count
+    });
+  }
+
+  async queueStepRunRerun(input: {
+    workflowRunId: string;
+    stepRunId: string;
+    reason: string;
+    comment?: string;
+    resetToBeforeCommit: boolean;
+  }) {
+    await this.client.artifactVersion.updateMany({
+      where: {
+        producerStepRunId: input.stepRunId,
+        status: "CANDIDATE"
+      },
+      data: {
+        status: "SUPERSEDED"
+      }
+    });
+
+    const result = await this.client.stepRun.updateMany({
+      where: {
+        id: input.stepRunId,
+        status: "CODEX_COMPLETED"
+      },
+      data: {
+        attempt: {
+          increment: 1
+        },
+        status: "READY",
+        codexThreadId: null,
+        promptSnapshot: null,
+        codexOptions: {},
+        codexFinalResponse: null,
+        codexUsage: Prisma.DbNull,
+        codexError: Prisma.DbNull,
+        codexCompletedAt: null,
+        startedAt: null,
+        completedAt: null,
+        staleReason: null
+      }
+    });
+
+    requireTransition(result, `StepRun ${input.stepRunId} was not CODEX_COMPLETED`);
+
+    await this.client.workflowRun.updateMany({
+      where: {
+        id: input.workflowRunId,
+        status: {
+          in: ["PENDING", "RUNNING", "WAITING"]
+        }
+      },
+      data: {
+        status: "RUNNING",
+        completedAt: null
+      }
+    });
+    await this.client.runEvent.create({
+      data: {
+        workflowRunId: input.workflowRunId,
+        eventType: "step_run.rerun_requested",
+        payload: {
+          stepRunId: input.stepRunId,
+          reason: input.reason,
+          comment: input.comment,
+          resetToBeforeCommit: input.resetToBeforeCommit
+        }
+      }
+    });
+    console.log("[runtime.step-runner] step.rerun_queued", {
+      workflowRunId: input.workflowRunId,
+      stepRunId: input.stepRunId,
+      reason: input.reason,
+      resetToBeforeCommit: input.resetToBeforeCommit
     });
   }
 

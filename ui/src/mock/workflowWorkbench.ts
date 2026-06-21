@@ -70,7 +70,7 @@ export const sampleSteps: StepDefinition[] = [
     output_artifacts: [{ artifact: "g1_requirements", filename: "requirements.md", format: "markdown" }],
     context_paths: [],
     tool_capabilities: ["*"],
-    evaluate: { evaluator: "mixed" },
+    evaluate: { evaluator: "mixed", rerun: false },
     prompt: "Convert the original request into intent-layer requirements.",
     acceptance: {
       criteria: [
@@ -90,7 +90,7 @@ export const sampleSteps: StepDefinition[] = [
     ],
     context_paths: [{ path: "worker/src", type: "directory", optional: true }],
     tool_capabilities: ["*"],
-    evaluate: { evaluator: "human_review" },
+    evaluate: { evaluator: "human_review", rerun: true },
     prompt: "Inspect backend workflow runtime gaps using the accepted requirements.",
     acceptance: {
       criteria: [
@@ -110,7 +110,7 @@ export const sampleSteps: StepDefinition[] = [
     ],
     context_paths: [{ path: "ui/src", type: "directory", optional: true }],
     tool_capabilities: ["*"],
-    evaluate: { evaluator: "human_review" },
+    evaluate: { evaluator: "human_review", rerun: true },
     prompt: "Inspect workflow builder UI gaps using the accepted requirements.",
     acceptance: {
       criteria: [
@@ -131,7 +131,7 @@ export const sampleSteps: StepDefinition[] = [
     output_artifacts: [{ artifact: "g4_plan", filename: "implementation-plan.md", format: "markdown" }],
     context_paths: [],
     tool_capabilities: ["*"],
-    evaluate: { evaluator: "mixed" },
+    evaluate: { evaluator: "mixed", rerun: false },
     prompt: "Turn the accepted backend and UI gap analyses into an implementation-ready plan.",
     acceptance: {
       criteria: ["The plan covers both branches.", "Risks and test scenarios are explicit."]

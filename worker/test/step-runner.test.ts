@@ -24,7 +24,8 @@ type StepRunStatus =
   | "WAITING_FOR_HUMAN_REVIEW"
   | "ACCEPTED"
   | "REJECTED"
-  | "FAILED";
+  | "FAILED"
+  | "STALE";
 
 type WorkflowVersionRow = {
   id: string;
@@ -45,11 +46,22 @@ type StepRunRow = {
   id: string;
   workflowRunId: string;
   stepId: string;
+  attempt: number;
   status: StepRunStatus;
   evaluator: StepRunEvaluator;
   codeWorkspaceId: string | null;
+  beforeCommit: string | null;
+  afterCommit: string | null;
+  codexThreadId: string | null;
+  promptSnapshot: string | null;
+  codexOptions: unknown;
+  codexFinalResponse: string | null;
+  codexUsage: unknown;
   codexError: unknown;
+  codexCompletedAt: Date | null;
+  staleReason: string | null;
   createdAt: Date;
+  startedAt: Date | null;
   completedAt: Date | null;
 };
 
@@ -79,6 +91,20 @@ type ArtifactVersionRow = {
   contentUri: string;
   contentHash: string;
   acceptedAt?: Date | null;
+};
+
+type CodeChangeRecordRow = {
+  stepRunId: string;
+  codeWorkspaceId: string;
+  beforeCommit: string;
+  afterCommit?: string | null;
+  status: string;
+};
+
+type RunEventRow = {
+  workflowRunId: string;
+  eventType: string;
+  payload: unknown;
 };
 
 function statusMatches(actual: string, expected: unknown) {
@@ -118,6 +144,8 @@ class FakeRuntimeDb {
   ];
   decisionEvents: DecisionEventRow[] = [];
   artifactVersions: ArtifactVersionRow[] = [];
+  codeChangeRecords: CodeChangeRecordRow[] = [];
+  runEvents: RunEventRow[] = [];
 
   constructor(
     steps: Array<{
@@ -127,6 +155,7 @@ class FakeRuntimeDb {
       upstream?: string;
       downstream?: string;
       evaluator: StepRunEvaluator;
+      rerun?: boolean;
       status?: StepRunStatus;
       createdAt?: Date;
       outputArtifacts?: Array<{
@@ -152,7 +181,15 @@ class FakeRuntimeDb {
         output_artifacts: step.outputArtifacts ?? [],
         context_paths: [],
         tool_capabilities: [],
-        evaluate: { evaluator: "mixed" },
+        evaluate: {
+          evaluator:
+            step.evaluator === StepRunEvaluator.HUMAN_REVIEW
+              ? "human_review"
+              : step.evaluator === StepRunEvaluator.EVALUATOR_REVIEW
+                ? "evaluator_review"
+                : "mixed",
+          rerun: step.rerun ?? false
+        },
         prompt: `Run ${step.id}.`,
         acceptance: { criteria: [] }
       })),
@@ -169,6 +206,7 @@ class FakeRuntimeDb {
       id: `step-run-${step.id}`,
       workflowRunId: this.workflowRun.id,
       stepId: step.id,
+      attempt: 1,
       status:
         step.status ??
         ((step.dependsOn?.length ?? 0) > 0 || step.upstream
@@ -176,8 +214,18 @@ class FakeRuntimeDb {
           : "READY"),
       evaluator: step.evaluator,
       codeWorkspaceId: "code-workspace-1",
+      beforeCommit: null,
+      afterCommit: null,
+      codexThreadId: null,
+      promptSnapshot: null,
+      codexOptions: {},
+      codexFinalResponse: null,
+      codexUsage: null,
       codexError: null,
+      codexCompletedAt: null,
+      staleReason: null,
       createdAt: step.createdAt ?? new Date(Date.UTC(2026, 0, 1, 0, 0, index)),
+      startedAt: null,
       completedAt: null
     }));
   }
@@ -248,7 +296,7 @@ class FakeRuntimeDb {
             stepId?: string;
             status?: unknown;
           };
-          data: Partial<StepRunRow>;
+          data: Partial<StepRunRow> & { attempt?: { increment: number } };
         }) => {
           const matches = this.stepRuns.filter(
             (stepRun) =>
@@ -257,7 +305,13 @@ class FakeRuntimeDb {
               (!args.where.stepId || stepRun.stepId === args.where.stepId) &&
               statusMatches(stepRun.status, args.where.status)
           );
-          matches.forEach((stepRun) => Object.assign(stepRun, args.data));
+          matches.forEach((stepRun) => {
+            const { attempt, ...data } = args.data;
+            Object.assign(stepRun, data);
+            if (attempt?.increment) {
+              stepRun.attempt += attempt.increment;
+            }
+          });
           return { count: matches.length };
         }
       },
@@ -292,6 +346,12 @@ class FakeRuntimeDb {
       decisionEvent: {
         create: async (args: { data: DecisionEventRow }) => {
           this.decisionEvents.push(args.data);
+          return args.data;
+        }
+      },
+      runEvent: {
+        create: async (args: { data: RunEventRow }) => {
+          this.runEvents.push(args.data);
           return args.data;
         }
       },
@@ -346,6 +406,28 @@ class FakeRuntimeDb {
       },
       contextPathEvent: {
         create: async () => ({})
+      },
+      codeChangeRecord: {
+        create: async (args: { data: CodeChangeRecordRow }) => {
+          this.codeChangeRecords.push(args.data);
+          return args.data;
+        },
+        updateMany: async (args: {
+          where: Partial<CodeChangeRecordRow>;
+          data: Partial<CodeChangeRecordRow>;
+        }) => {
+          const matches = this.codeChangeRecords.filter(
+            (record) =>
+              (!args.where.stepRunId || record.stepRunId === args.where.stepRunId) &&
+              (!args.where.codeWorkspaceId ||
+                record.codeWorkspaceId === args.where.codeWorkspaceId) &&
+              (!args.where.beforeCommit ||
+                record.beforeCommit === args.where.beforeCommit) &&
+              (!args.where.status || record.status === args.where.status)
+          );
+          matches.forEach((record) => Object.assign(record, args.data));
+          return { count: matches.length };
+        }
       }
     } as NonNullable<StepRunnerDependencies["client"]>;
   }
@@ -432,6 +514,65 @@ function createEvaluator(evaluations: EvaluateStepInput[] = []) {
   };
 }
 
+function createCheckpointRuntime(db: FakeRuntimeDb): NonNullable<StepRunnerDependencies["checkpointRuntime"]> {
+  return {
+    recordBefore: async (input) => {
+      const beforeCommit = `before-${input.stepRunId}-attempt-${db.requireStepRun(input.stepRunId).attempt}`;
+      const stepRun = db.requireStepRun(input.stepRunId);
+      stepRun.beforeCommit = beforeCommit;
+      db.codeChangeRecords.push({
+        stepRunId: input.stepRunId,
+        codeWorkspaceId: input.codeWorkspaceId ?? "code-workspace-1",
+        beforeCommit,
+        status: "candidate"
+      });
+      return beforeCommit;
+    },
+    commitApproved: async (input) => {
+      const afterCommit = `after-${input.stepRunId}-attempt-${db.requireStepRun(input.stepRunId).attempt}`;
+      const stepRun = db.requireStepRun(input.stepRunId);
+      stepRun.afterCommit = afterCommit;
+      db.codeChangeRecords
+        .filter(
+          (record) =>
+            record.stepRunId === input.stepRunId &&
+            record.beforeCommit === input.beforeCommit &&
+            record.status === "candidate"
+        )
+        .forEach((record) => {
+          record.afterCommit = afterCommit;
+          record.status = "accepted";
+        });
+      return afterCommit;
+    },
+    resetBeforeRerun: async (input) => {
+      db.codeChangeRecords
+        .filter(
+          (record) =>
+            record.stepRunId === input.stepRunId &&
+            record.beforeCommit === input.beforeCommit &&
+            record.status === "candidate"
+        )
+        .forEach((record) => {
+          record.status = "reverted";
+        });
+      return true;
+    },
+    markRejected: async (input) => {
+      db.codeChangeRecords
+        .filter(
+          (record) =>
+            record.stepRunId === input.stepRunId &&
+            record.beforeCommit === input.beforeCommit &&
+            record.status === "candidate"
+        )
+        .forEach((record) => {
+          record.status = "rejected";
+        });
+    }
+  };
+}
+
 function dependencies(
   db: FakeRuntimeDb,
   overrides: Partial<StepRunnerDependencies> = {}
@@ -440,6 +581,7 @@ function dependencies(
     client: db.client(),
     executeStepRun: createExecutor(db),
     evaluateStep: createEvaluator(),
+    checkpointRuntime: createCheckpointRuntime(db),
     resolveWorkingDirectory: () => "C:\\repo",
     now: () => new Date(Date.UTC(2026, 0, 2)),
     ...overrides
@@ -724,6 +866,82 @@ describe("runNextReadyStep", () => {
         artifactKey: "report",
         producerStepRunId: "step-run-step-1",
         status: "REJECTED"
+      }
+    ]);
+  });
+
+  it("queues a checkpointed rerun for evaluator rejection when the step opts in", async () => {
+    const workingDirectory = await makeTempDirectory("step-worktree-");
+    const artifactStoreRoot = await makeTempDirectory("artifact-store-");
+    const db = new FakeRuntimeDb([
+      {
+        id: "step-1",
+        type: "agent",
+        evaluator: StepRunEvaluator.EVALUATOR_REVIEW,
+        rerun: true,
+        outputArtifacts: [
+          {
+            artifact: "report",
+            filename: "report.md",
+            format: "markdown"
+          }
+        ]
+      },
+      {
+        id: "step-2",
+        type: "agent",
+        dependsOn: ["step-1"],
+        evaluator: StepRunEvaluator.EVALUATOR_REVIEW
+      }
+    ]);
+
+    const result = await runNextReadyStep(
+      dependencies(db, {
+        resolveWorkingDirectory: () => workingDirectory,
+        resolveArtifactStoreRoot: () => artifactStoreRoot,
+        evaluateStep: async (input) => ({
+          decisions: [
+            {
+              stepRunId: input.stepRunId,
+              source: DecisionSource.EVALUATOR,
+              verdict: DecisionVerdict.REJECT,
+              comment: "The report needs concrete evidence."
+            }
+          ],
+          finalVerdict: DecisionVerdict.REJECT
+        })
+      })
+    );
+
+    expect(result).toMatchObject({ picked: true, outcome: "rerun_queued" });
+    expect(db.requireStepRun("step-run-step-1")).toMatchObject({
+      status: "READY",
+      attempt: 2
+    });
+    expect(db.requireStepRun("step-run-step-2").status).toBe("PENDING");
+    expect(db.workflowRun.status).toBe("RUNNING");
+    expect(db.artifactVersions).toMatchObject([
+      {
+        artifactKey: "report",
+        producerStepRunId: "step-run-step-1",
+        status: "SUPERSEDED"
+      }
+    ]);
+    expect(db.codeChangeRecords).toMatchObject([
+      {
+        stepRunId: "step-run-step-1",
+        status: "reverted"
+      }
+    ]);
+    expect(db.runEvents).toMatchObject([
+      {
+        eventType: "step_run.rerun_requested",
+        payload: {
+          stepRunId: "step-run-step-1",
+          reason: "evaluator_rejected",
+          comment: "The report needs concrete evidence.",
+          resetToBeforeCommit: true
+        }
       }
     ]);
   });

@@ -125,7 +125,7 @@ function stepDefinition(step: Partial<StepDefinition>): StepDefinition {
     output_artifacts: [],
     context_paths: [],
     tool_capabilities: [],
-    evaluate: { evaluator: "mixed" },
+    evaluate: { evaluator: "mixed", rerun: false },
     prompt: "Run the step.",
     acceptance: { criteria: [] },
     ...step

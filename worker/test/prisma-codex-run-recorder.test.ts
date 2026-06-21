@@ -44,11 +44,29 @@ describe("PrismaCodexRunRecorder", () => {
     });
   });
 
+  it("loads the latest reject comment as rerun feedback", async () => {
+    const client = clientWithStepRun([
+      {
+        verdict: "REJECT",
+        comment: "Cite the failing acceptance criterion."
+      }
+    ]);
+    const recorder = new PrismaCodexRunRecorder(client);
+
+    await expect(recorder.loadSource("step-run-1")).resolves.toMatchObject({
+      revisionRequestComment: "Cite the failing acceptance criterion."
+    });
+  });
+
   it("does not reuse stale revision comments after a later human approval", async () => {
     const client = clientWithStepRun([
       {
         verdict: "APPROVE",
         comment: "Looks good."
+      },
+      {
+        verdict: "REJECT",
+        comment: "Older rejection."
       }
     ]);
     const recorder = new PrismaCodexRunRecorder(client);

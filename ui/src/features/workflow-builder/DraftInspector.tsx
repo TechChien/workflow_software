@@ -137,6 +137,7 @@ export function DraftInspector({
               onStepChange((current) => ({
                 ...current,
                 evaluate: {
+                  ...current.evaluate,
                   evaluator: event.target.value as StepDefinition["evaluate"]["evaluator"]
                 }
               }))
@@ -146,6 +147,22 @@ export function DraftInspector({
             <option value="human_review">Human Review</option>
             <option value="evaluator_review">Evaluator Review</option>
           </select>
+        </label>
+        <label className="field checkbox-field">
+          <span>Rerun on reject</span>
+          <input
+            checked={step.evaluate.rerun}
+            type="checkbox"
+            onChange={(event) =>
+              onStepChange((current) => ({
+                ...current,
+                evaluate: {
+                  ...current.evaluate,
+                  rerun: event.target.checked
+                }
+              }))
+            }
+          />
         </label>
       </div>
 

@@ -32,11 +32,8 @@ export class PrismaCodexRunRecorder implements CodexRunRecorder {
         stepId: true,
         attempt: true,
         decisionEvents: {
-          where: {
-            source: "HUMAN"
-          },
           orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-          take: 1,
+          take: 5,
           select: {
             verdict: true,
             comment: true
@@ -54,7 +51,10 @@ export class PrismaCodexRunRecorder implements CodexRunRecorder {
         }
       }
     });
-    const latestHumanDecision = stepRun.decisionEvents[0];
+    const latestDecision = stepRun.decisionEvents[0];
+    const latestDecisionNeedsRevision =
+      latestDecision &&
+      ["REJECT", "REQUEST_REVISION"].includes(latestDecision.verdict);
 
     return {
       stepId: stepRun.stepId,
@@ -62,9 +62,7 @@ export class PrismaCodexRunRecorder implements CodexRunRecorder {
       yamlSnapshot: stepRun.workflowRun.workflowVersion.yamlSnapshot,
       contentHash: stepRun.workflowRun.workflowVersion.contentHash,
       revisionRequestComment:
-        latestHumanDecision?.verdict === "REQUEST_REVISION"
-          ? latestHumanDecision.comment ?? undefined
-          : undefined
+        latestDecisionNeedsRevision ? latestDecision.comment ?? undefined : undefined
     };
   }
 

@@ -14,6 +14,7 @@ import { canonicalizeWorkflowDefinition } from "../src/runtime/workflow-definiti
 function snapshotFor(step: {
   id: string;
   type?: "agent" | "code_agent";
+  rerun?: boolean;
 }): Pick<ReadyStepRun["workflowRun"]["workflowVersion"], "yamlSnapshot" | "contentHash"> {
   const workflow: WorkflowYaml = {
     id: "workflow-1",
@@ -30,7 +31,7 @@ function snapshotFor(step: {
         output_artifacts: [],
         context_paths: [],
         tool_capabilities: [],
-        evaluate: { evaluator: "mixed" },
+        evaluate: { evaluator: "mixed", rerun: step.rerun ?? false },
         prompt: `Run ${step.id}.`,
         acceptance: { criteria: [] }
       }
@@ -45,17 +46,22 @@ function snapshotFor(step: {
   };
 }
 
-function readyStepRun(evaluator: StepRunEvaluator): ReadyStepRun {
+function readyStepRun(
+  evaluator: StepRunEvaluator,
+  options: { rerun?: boolean; attempt?: number } = {}
+): ReadyStepRun {
   return {
     id: "step-run-1",
     workflowRunId: "workflow-run-1",
     stepId: "step-1",
+    attempt: options.attempt ?? 1,
     evaluator,
     codeWorkspaceId: "workspace-1",
+    beforeCommit: null,
     workflowRun: {
       workflowVersion: {
         workflowId: "workflow-1",
-        ...snapshotFor({ id: "step-1" })
+        ...snapshotFor({ id: "step-1", rerun: options.rerun })
       }
     }
   };
@@ -80,6 +86,7 @@ function createHarness(input: {
       statuses[0] = { stepId: "step-1", status: "ACCEPTED" };
     }),
     markStepRunRejected: vi.fn(async () => undefined),
+    queueStepRunRerun: vi.fn(async () => undefined),
     persistDecisions: vi.fn(async () => undefined),
     workflowStepRunStatuses: vi.fn(async () => statuses),
     readyDownstreamStep: vi.fn(async () => undefined)
@@ -92,6 +99,12 @@ function createHarness(input: {
     persistDeclaredOutputs: vi.fn(async () => undefined),
     acceptProduced: vi.fn(async () => undefined),
     rejectProduced: vi.fn(async () => undefined)
+  };
+  const checkpointRuntime = {
+    recordBefore: vi.fn(async () => "before-commit"),
+    commitApproved: vi.fn(async () => "after-commit"),
+    resetBeforeRerun: vi.fn(async () => true),
+    markRejected: vi.fn(async () => undefined)
   };
   const executeStepRun =
     input.executeStepRun ??
@@ -124,6 +137,7 @@ function createHarness(input: {
     repository,
     workspaceResolver,
     artifactRuntime,
+    checkpointRuntime,
     executeStepRun,
     evaluateStep,
     resolveArtifactStoreRoot: () => "C:\\artifacts",
@@ -135,6 +149,7 @@ function createHarness(input: {
     repository,
     workspaceResolver,
     artifactRuntime,
+    checkpointRuntime,
     executeStepRun,
     evaluateStep
   };
@@ -178,6 +193,33 @@ describe("StepRunnerOrchestrator", () => {
     expect(artifactRuntime.rejectProduced).toHaveBeenCalled();
     expect(repository.markStepRunRejected).toHaveBeenCalled();
     expect(repository.markWorkflowRunFailed).toHaveBeenCalled();
+  });
+
+  it("queues a rerun for non-approved evaluation results when the step opts in", async () => {
+    const { orchestrator, repository, artifactRuntime, checkpointRuntime } = createHarness({
+      stepRun: readyStepRun(StepRunEvaluator.EVALUATOR_REVIEW, { rerun: true }),
+      finalVerdict: DecisionVerdict.REJECT
+    });
+
+    await expect(orchestrator.runNextReadyStep()).resolves.toMatchObject({
+      picked: true,
+      outcome: "rerun_queued"
+    });
+    expect(checkpointRuntime.resetBeforeRerun).toHaveBeenCalledWith({
+      stepRunId: "step-run-1",
+      codeWorkspaceId: "workspace-1",
+      workingDirectory: "C:\\repo",
+      beforeCommit: "before-commit"
+    });
+    expect(repository.queueStepRunRerun).toHaveBeenCalledWith({
+      workflowRunId: "workflow-run-1",
+      stepRunId: "step-run-1",
+      reason: "evaluator_rejected",
+      comment: "Reviewed.",
+      resetToBeforeCommit: true
+    });
+    expect(artifactRuntime.rejectProduced).not.toHaveBeenCalled();
+    expect(repository.markWorkflowRunFailed).not.toHaveBeenCalled();
   });
 
   it("waits for human review without accepting downstream progress", async () => {

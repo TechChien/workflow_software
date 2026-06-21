@@ -7,10 +7,14 @@ import {
   workflowStepIds,
   type WorkflowYaml
 } from "@workflow-software/shared";
-import { resetToCommit } from "../../code-workspace/git-checkpoints.js";
+import {
+  commitApprovedStep,
+  resetToCommit
+} from "../../code-workspace/git-checkpoints.js";
 import { prisma } from "../../db/prisma.js";
 import { Prisma } from "../../generated/prisma/client.js";
 import { badRequest, notFound } from "../errors.js";
+import { shouldRerunForHumanDecision } from "./human-decision-policy.js";
 import {
   serializeDecisionEvent,
   serializeStandaloneStepRunDetail,
@@ -90,6 +94,22 @@ function downstreamStepIds(workflow: WorkflowYaml, stepId: string) {
   return transitiveDependentStepIds(workflow, stepId);
 }
 
+function stepForDecision(workflow: WorkflowYaml, stepId: string) {
+  const step = workflow.steps.find((candidate) => candidate.id === stepId);
+
+  if (!step) {
+    throw badRequest("StepRun stepId was not found in its workflow snapshot", {
+      stepId
+    });
+  }
+
+  return step;
+}
+
+function approvedStepCommitMessage(stepId: string, stepRunId: string) {
+  return `Approve workflow step ${stepId} (${stepRunId})`;
+}
+
 export async function registerHumanDecisionRoutes(app: FastifyInstance) {
   app.post("/:stepRunId", async (request, reply) => {
     const { stepRunId } = request.params as { stepRunId: string };
@@ -129,19 +149,49 @@ export async function registerHumanDecisionRoutes(app: FastifyInstance) {
       stepRun.workflowRun.workflowVersion.yamlSnapshot,
       stepRun.stepId
     );
+    const step = stepForDecision(workflow, stepRun.stepId);
     const downstream = downstreamStepIds(workflow, stepRun.stepId);
+    const shouldRerun = shouldRerunForHumanDecision(step, body.verdict);
     let resetToBeforeCommit = false;
+    let approvedAfterCommit: string | undefined;
 
-    if (body.verdict === "request_revision" && stepRun.beforeCommit && stepRun.codeWorkspaceId) {
+    if (body.verdict === "approve" && stepRun.codeWorkspaceId) {
       const workspace = await prisma.codeWorkspace.findUnique({
         where: { id: stepRun.codeWorkspaceId },
         select: { worktreePath: true }
       });
 
       if (workspace) {
-        await resetToCommit(workspace.worktreePath, stepRun.beforeCommit);
-        resetToBeforeCommit = true;
+        approvedAfterCommit = await commitApprovedStep(
+          workspace.worktreePath,
+          approvedStepCommitMessage(stepRun.stepId, stepRun.id)
+        );
       }
+    }
+
+    if (shouldRerun) {
+      if (!stepRun.beforeCommit || !stepRun.codeWorkspaceId) {
+        throw badRequest("StepRun cannot rerun without a recorded checkpoint", {
+          stepRunId,
+          hasBeforeCommit: Boolean(stepRun.beforeCommit),
+          hasCodeWorkspace: Boolean(stepRun.codeWorkspaceId)
+        });
+      }
+
+      const workspace = await prisma.codeWorkspace.findUnique({
+        where: { id: stepRun.codeWorkspaceId },
+        select: { worktreePath: true }
+      });
+
+      if (!workspace) {
+        throw badRequest("StepRun cannot rerun because its code workspace was not found", {
+          stepRunId,
+          codeWorkspaceId: stepRun.codeWorkspaceId
+        });
+      }
+
+      await resetToCommit(workspace.worktreePath, stepRun.beforeCommit);
+      resetToBeforeCommit = true;
     }
 
     const decisionEvent = await prisma.$transaction(async (tx) => {
@@ -181,10 +231,25 @@ export async function registerHumanDecisionRoutes(app: FastifyInstance) {
             acceptedAt: now
           }
         });
+        if (approvedAfterCommit && stepRun.beforeCommit && stepRun.codeWorkspaceId) {
+          await db.codeChangeRecord.updateMany({
+            where: {
+              stepRunId,
+              codeWorkspaceId: stepRun.codeWorkspaceId,
+              beforeCommit: stepRun.beforeCommit,
+              status: "candidate"
+            },
+            data: {
+              afterCommit: approvedAfterCommit,
+              status: "accepted"
+            }
+          });
+        }
         await db.stepRun.update({
           where: { id: stepRunId },
           data: {
             status: "ACCEPTED",
+            afterCommit: approvedAfterCommit,
             completedAt: now
           }
         });
@@ -241,7 +306,7 @@ export async function registerHumanDecisionRoutes(app: FastifyInstance) {
             }
           });
         }
-      } else if (body.verdict === "request_revision") {
+      } else if (shouldRerun) {
         const affectedStepRuns =
           downstream.length > 0
             ? await db.stepRun.findMany({
@@ -269,6 +334,19 @@ export async function registerHumanDecisionRoutes(app: FastifyInstance) {
             status: "SUPERSEDED"
           }
         });
+        if (stepRun.beforeCommit && stepRun.codeWorkspaceId) {
+          await db.codeChangeRecord.updateMany({
+            where: {
+              stepRunId,
+              codeWorkspaceId: stepRun.codeWorkspaceId,
+              beforeCommit: stepRun.beforeCommit,
+              status: "candidate"
+            },
+            data: {
+              status: "reverted"
+            }
+          });
+        }
         await db.stepRun.update({
           where: { id: stepRunId },
           data: {
@@ -276,6 +354,9 @@ export async function registerHumanDecisionRoutes(app: FastifyInstance) {
               increment: 1
             },
             status: "READY",
+            codexThreadId: null,
+            promptSnapshot: null,
+            codexOptions: {},
             startedAt: null,
             completedAt: null,
             codexFinalResponse: null,
@@ -316,7 +397,7 @@ export async function registerHumanDecisionRoutes(app: FastifyInstance) {
             eventType: "step_run.rerun_requested",
             payload: {
               stepRunId,
-              reason: "revision_requested",
+              reason: body.verdict === "reject" ? "human_rejected" : "revision_requested",
               comment,
               resetToBeforeCommit
             }
@@ -332,6 +413,19 @@ export async function registerHumanDecisionRoutes(app: FastifyInstance) {
             status: "REJECTED"
           }
         });
+        if (stepRun.beforeCommit && stepRun.codeWorkspaceId) {
+          await db.codeChangeRecord.updateMany({
+            where: {
+              stepRunId,
+              codeWorkspaceId: stepRun.codeWorkspaceId,
+              beforeCommit: stepRun.beforeCommit,
+              status: "candidate"
+            },
+            data: {
+              status: "rejected"
+            }
+          });
+        }
         await db.stepRun.update({
           where: { id: stepRunId },
           data: {
