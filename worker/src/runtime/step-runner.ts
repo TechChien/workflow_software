@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import { prisma } from "../db/prisma.js";
 import { env } from "../config/env.js";
 import type { ExecuteStepRunWithCodexInput } from "./codex-step-executor.js";
-import { executeStepRunWithCodex } from "./execute-step-run-with-codex.js";
+import { executeStepRunWithAgent } from "./execute-step-run-with-agent.js";
 import type {
   EvaluateStepInput,
   EvaluateStepResult
@@ -102,7 +102,7 @@ export async function runNextReadyStep(
   const orchestrator = new StepRunnerOrchestrator({
     repository:
       dependencies.repository ?? new PrismaStepRunnerRepository(client),
-    executeStepRun: dependencies.executeStepRun ?? executeStepRunWithCodex,
+    executeStepRun: dependencies.executeStepRun ?? executeStepRunWithAgent,
     evaluateStep: dependencies.evaluateStep ?? evaluateStepArtifact,
     workspaceResolver: resolveWorkspaceResolver(client, dependencies),
     artifactRuntime:

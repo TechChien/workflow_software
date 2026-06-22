@@ -111,12 +111,7 @@ export class PrismaCodexRunRecorder implements CodexRunRecorder {
   async markCompleted(input: {
     stepRunId: string;
     finalResponse: string;
-    usage: {
-      input_tokens: number;
-      cached_input_tokens: number;
-      output_tokens: number;
-      reasoning_output_tokens: number;
-    };
+    usage: Record<string, unknown>;
   }): Promise<void> {
     const result = await this.client.stepRun.updateMany({
       where: {

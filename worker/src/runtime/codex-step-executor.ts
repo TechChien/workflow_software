@@ -1,13 +1,16 @@
 import { stat } from "node:fs/promises";
 import path from "node:path";
-import type { ThreadEvent, Usage } from "@openai/codex-sdk";
-import {
-  buildCodexOptionsSnapshot,
-  buildCodexThreadOptions,
-  type CodexGateway,
-  type CodexRuntimeSettings
+import type {
+  CodexGateway,
+  CodexRuntimeSettings
 } from "../codex/codex-client.js";
-import { normalizeCodexEvent } from "../codex/codex-event-normalizer.js";
+import {
+  AgentRunError,
+  type AgentRunRequest,
+  type AgentRunResult,
+  type IAgent
+} from "../agents/agent.js";
+import { CodexAgent } from "../agents/codex-agent.js";
 import type {
   CodexRunFailure,
   CodexRunRecorder,
@@ -29,25 +32,30 @@ export type CodexExecutorDependencies = {
   settings: CodexRuntimeSettings;
 };
 
-export type CodexExecutionResult = {
-  stepRunId: string;
-  threadId: string;
-  finalResponse: string;
-  usage: Usage;
+export type AgentExecutorDependencies = {
+  agent: IAgent;
+  recorder: CodexRunRecorder;
+  timeoutMs: number;
 };
+
+export type AgentExecutionResult = AgentRunResult & {
+  stepRunId: string;
+};
+
+export type CodexExecutionResult = AgentExecutionResult;
 
 export type CodexRuntimePromptOptions = {
   revisionRequestComment?: string;
 };
 
-export class CodexExecutionError extends Error {
+export class CodexExecutionError extends AgentRunError {
   constructor(
     readonly code: string,
     message: string,
     readonly eventRecorded = false,
     options?: ErrorOptions
   ) {
-    super(message, options);
+    super("codex", code, message, eventRecorded, options);
     this.name = "CodexExecutionError";
   }
 }
@@ -253,44 +261,40 @@ function createRunAbortState(externalSignal: AbortSignal | undefined, timeoutMs:
 function failureFromError(
   error: unknown,
   input: ExecuteStepRunWithCodexInput,
-  timedOut: boolean
-): CodexExecutionError {
-  if (error instanceof CodexExecutionError) {
+  timedOut: boolean,
+  agent: IAgent
+): AgentRunError {
+  if (error instanceof AgentRunError) {
     return error;
   }
 
   if (timedOut) {
-    return new CodexExecutionError(
-      "codex_turn_timeout",
-      "Codex turn exceeded the configured timeout",
+    return new AgentRunError(
+      agent.provider,
+      `${agent.provider}_turn_timeout`,
+      `${agent.provider} turn exceeded the configured timeout`,
       false,
       { cause: error }
     );
   }
 
   if (input.signal?.aborted) {
-    return new CodexExecutionError("codex_turn_aborted", "Codex turn was aborted", false, {
-      cause: error
-    });
+    return new AgentRunError(
+      agent.provider,
+      `${agent.provider}_turn_aborted`,
+      `${agent.provider} turn was aborted`,
+      false,
+      { cause: error }
+    );
   }
 
-  return new CodexExecutionError(
-    "codex_execution_error",
-    error instanceof Error ? error.message : "Codex execution failed",
+  return new AgentRunError(
+    agent.provider,
+    `${agent.provider}_execution_error`,
+    error instanceof Error ? error.message : `${agent.provider} execution failed`,
     false,
     { cause: error }
   );
-}
-
-function failureFromTerminalEvent(event: ThreadEvent): CodexExecutionError | undefined {
-  switch (event.type) {
-    case "turn.failed":
-      return new CodexExecutionError("codex_turn_failed", event.error.message, true);
-    case "error":
-      return new CodexExecutionError("codex_stream_error", event.message, true);
-    default:
-      return undefined;
-  }
 }
 
 async function persistFailure(
@@ -298,7 +302,7 @@ async function persistFailure(
   stepRunId: string,
   attempt: number,
   sequence: number,
-  error: CodexExecutionError
+  error: AgentRunError
 ) {
   const failure: CodexRunFailure = {
     code: error.code,
@@ -312,7 +316,10 @@ async function persistFailure(
         sequence,
         kind: "error",
         status: "failed",
-        payload: failure
+        payload: {
+          agentProvider: error.provider,
+          ...failure
+        }
       });
     }
   } finally {
@@ -320,32 +327,33 @@ async function persistFailure(
   }
 }
 
-export async function executeStepRunWithCodexCore(
+export async function executeStepRunWithAgentCore(
   input: ExecuteStepRunWithCodexInput,
-  dependencies: CodexExecutorDependencies
-): Promise<CodexExecutionResult> {
-  console.log("[runtime.codex-executor] start", {
+  dependencies: AgentExecutorDependencies
+): Promise<AgentExecutionResult> {
+  console.log("[runtime.agent-executor] start", {
     stepRunId: input.stepRunId,
-    workingDirectory: input.workingDirectory,
+    provider: dependencies.agent.provider,
+    workingDirectory: input.workingDirectory
   });
   await assertWorkingDirectory(input.workingDirectory);
-  console.log("[runtime.codex-executor] working_directory.valid", {
+  console.log("[runtime.agent-executor] working_directory.valid", {
     stepRunId: input.stepRunId,
-    workingDirectory: input.workingDirectory,
+    workingDirectory: input.workingDirectory
   });
 
   const source = await dependencies.recorder.loadSource(input.stepRunId);
-  console.log("[runtime.codex-executor] source.loaded", {
+  console.log("[runtime.agent-executor] source.loaded", {
     stepRunId: input.stepRunId,
     workflowStepId: source.stepId,
-    contentHash: source.contentHash,
+    contentHash: source.contentHash
   });
   const {
     stepType,
     prompt: workflowPrompt,
-    acceptanceCriteria,
+    acceptanceCriteria
   } = resolveCodexStepPrompt(source);
-  console.log("[runtime.codex-executor] prompt.resolved", {
+  console.log("[runtime.agent-executor] prompt.resolved", {
     stepRunId: input.stepRunId,
     workflowStepId: source.stepId,
     stepType,
@@ -355,9 +363,9 @@ export async function executeStepRunWithCodexCore(
       ? {
           contextPaths: input.runtimeContext.contextPaths.length,
           inputArtifacts: input.runtimeContext.inputArtifacts.length,
-          outputArtifacts: input.runtimeContext.outputArtifacts.length,
+          outputArtifacts: input.runtimeContext.outputArtifacts.length
         }
-      : undefined,
+      : undefined
   });
   const prompt = buildCodexRuntimePrompt(
     workflowPrompt,
@@ -365,155 +373,110 @@ export async function executeStepRunWithCodexCore(
     input.runtimeContext,
     { revisionRequestComment: source.revisionRequestComment }
   );
-  const threadOptions = buildCodexThreadOptions(input.workingDirectory, dependencies.settings, {
-    additionalDirectories: buildCodexAdditionalDirectories(input.runtimeContext)
-  });
+  const request: AgentRunRequest = {
+    purpose: "step_execution",
+    permissionProfile: "workspace-write",
+    prompt,
+    workingDirectory: input.workingDirectory,
+    additionalDirectories: buildCodexAdditionalDirectories(input.runtimeContext),
+    timeoutMs: dependencies.timeoutMs
+  };
 
   await dependencies.recorder.markStarted({
     stepRunId: input.stepRunId,
     promptSnapshot: prompt,
-    codexOptions: buildCodexOptionsSnapshot(threadOptions)
+    codexOptions: dependencies.agent.optionsSnapshot(request)
   });
-  console.log("[runtime.codex-executor] recorder.mark_started", {
+  console.log("[runtime.agent-executor] recorder.mark_started", {
     stepRunId: input.stepRunId,
+    provider: dependencies.agent.provider,
     promptSnapshotLength: prompt.length,
-    model: threadOptions.model,
-    modelReasoningEffort: threadOptions.modelReasoningEffort,
-    sandboxMode: threadOptions.sandboxMode,
-    approvalPolicy: threadOptions.approvalPolicy,
-    additionalDirectories:
-      "additionalDirectories" in threadOptions &&
-      Array.isArray(threadOptions.additionalDirectories)
-        ? threadOptions.additionalDirectories.length
-        : 0,
+    timeoutMs: dependencies.timeoutMs,
+    additionalDirectories: request.additionalDirectories?.length ?? 0
   });
 
-  const abortState = createRunAbortState(input.signal, dependencies.settings.timeoutMs);
+  const abortState = createRunAbortState(input.signal, dependencies.timeoutMs);
   let sequence = 0;
-  let threadId: string | undefined;
-  let finalResponse: string | undefined;
-  let usage: Usage | undefined;
-  let completed = false;
-  let terminalFailure: CodexExecutionError | undefined;
+  let sessionRecorded = false;
 
   try {
-    console.log("[runtime.codex-executor] turn.start", {
+    console.log("[runtime.agent-executor] turn.start", {
       stepRunId: input.stepRunId,
-      timeoutMs: dependencies.settings.timeoutMs,
+      provider: dependencies.agent.provider,
+      timeoutMs: dependencies.timeoutMs
     });
-    const events = await dependencies.gateway.runTurn({
-      prompt,
-      threadOptions,
-      signal: abortState.signal
-    });
+    const result = await dependencies.agent.run(
+      {
+        ...request,
+        signal: abortState.signal
+      },
+      {
+        onSessionStarted: async (sessionId) => {
+          if (sessionRecorded) {
+            return;
+          }
 
-    for await (const event of events) {
-      if (event.type === "thread.started") {
-        threadId = event.thread_id;
-        console.log("[runtime.codex-executor] thread.started", {
-          stepRunId: input.stepRunId,
-          threadId,
-        });
-        await dependencies.recorder.recordThreadStarted(input.stepRunId, event.thread_id);
-        continue;
+          sessionRecorded = true;
+          console.log("[runtime.agent-executor] session.started", {
+            stepRunId: input.stepRunId,
+            provider: dependencies.agent.provider,
+            sessionId
+          });
+          await dependencies.recorder.recordThreadStarted(input.stepRunId, sessionId);
+        },
+        onEvent: async (event) => {
+          sequence += 1;
+          console.log("[runtime.agent-executor] event.record", {
+            stepRunId: input.stepRunId,
+            sequence,
+            provider: dependencies.agent.provider,
+            kind: event.kind,
+            status: event.status,
+            externalItemId: event.externalItemId
+          });
+          await dependencies.recorder.appendEvent(input.stepRunId, {
+            attempt: source.attempt,
+            sequence,
+            ...event
+          });
+        }
       }
+    );
 
-      if (event.type === "item.completed" && event.item.type === "agent_message") {
-        finalResponse = event.item.text;
-        console.log("[runtime.codex-executor] agent_message.completed", {
-          stepRunId: input.stepRunId,
-          messageLength: finalResponse.length,
-        });
-      }
-
-      const normalized = normalizeCodexEvent(event);
-      if (normalized) {
-        sequence += 1;
-        console.log("[runtime.codex-executor] event.record", {
-          stepRunId: input.stepRunId,
-          sequence,
-          eventType: event.type,
-          kind: normalized.kind,
-          status: normalized.status,
-          externalItemId: normalized.externalItemId,
-        });
-        await dependencies.recorder.appendEvent(input.stepRunId, {
-          attempt: source.attempt,
-          sequence,
-          ...normalized
-        });
-      }
-
-      if (event.type === "turn.completed") {
-        usage = event.usage;
-        completed = true;
-        console.log("[runtime.codex-executor] turn.completed", {
-          stepRunId: input.stepRunId,
-          usage,
-        });
-      }
-
-      terminalFailure ??= failureFromTerminalEvent(event);
-      if (terminalFailure) {
-        console.log("[runtime.codex-executor] terminal_failure", {
-          stepRunId: input.stepRunId,
-          code: terminalFailure.code,
-          message: terminalFailure.message,
-        });
-        break;
-      }
-    }
-
-    if (terminalFailure) {
-      throw terminalFailure;
-    }
-
-    if (!completed || !usage) {
-      throw new CodexExecutionError(
-        "codex_stream_ended_without_completion",
-        "Codex event stream ended before turn.completed"
-      );
-    }
-
-    if (!threadId) {
-      throw new CodexExecutionError(
-        "codex_thread_id_missing",
-        "Codex event stream completed without thread.started"
-      );
-    }
-
-    if (finalResponse === undefined) {
-      throw new CodexExecutionError(
-        "codex_final_response_missing",
-        "Codex turn completed without an agent message"
-      );
+    if (!sessionRecorded) {
+      await dependencies.recorder.recordThreadStarted(input.stepRunId, result.sessionId);
     }
 
     await dependencies.recorder.markCompleted({
       stepRunId: input.stepRunId,
-      finalResponse,
-      usage
+      finalResponse: result.finalResponse,
+      usage: result.usage
     });
-    console.log("[runtime.codex-executor] recorder.mark_completed", {
+    console.log("[runtime.agent-executor] recorder.mark_completed", {
       stepRunId: input.stepRunId,
-      threadId,
-      finalResponseLength: finalResponse.length,
-      usage,
+      provider: dependencies.agent.provider,
+      sessionId: result.sessionId,
+      finalResponseLength: result.finalResponse.length,
+      usage: result.usage
     });
 
     return {
       stepRunId: input.stepRunId,
-      threadId,
-      finalResponse,
-      usage
+      ...result
     };
   } catch (error) {
-    const executionError = failureFromError(error, input, abortState.timedOut());
-    console.log("[runtime.codex-executor] failed", {
+    const executionError = failureFromError(
+      error,
+      input,
+      abortState.timedOut(),
+      dependencies.agent
+    );
+    console.log("[runtime.agent-executor] failed", {
       stepRunId: input.stepRunId,
+      provider: dependencies.agent.provider,
       code: executionError.code,
       message: executionError.message,
-      eventRecorded: executionError.eventRecorded,
+      eventRecorded: executionError.eventRecorded
     });
     await persistFailure(
       dependencies.recorder,
@@ -525,8 +488,20 @@ export async function executeStepRunWithCodexCore(
     throw executionError;
   } finally {
     abortState.dispose();
-    console.log("[runtime.codex-executor] cleanup", {
+    console.log("[runtime.agent-executor] cleanup", {
       stepRunId: input.stepRunId,
+      provider: dependencies.agent.provider
     });
   }
+}
+
+export async function executeStepRunWithCodexCore(
+  input: ExecuteStepRunWithCodexInput,
+  dependencies: CodexExecutorDependencies
+): Promise<CodexExecutionResult> {
+  return executeStepRunWithAgentCore(input, {
+    agent: new CodexAgent(dependencies.gateway, dependencies.settings),
+    recorder: dependencies.recorder,
+    timeoutMs: dependencies.settings.timeoutMs
+  });
 }

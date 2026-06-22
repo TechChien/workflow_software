@@ -3,6 +3,12 @@ import path from "node:path";
 import type { ThreadEvent, Usage } from "@openai/codex-sdk";
 import type { StepDefinition } from "@workflow-software/shared";
 import { describe, expect, it } from "vitest";
+import type {
+  AgentRunObserver,
+  AgentRunRequest,
+  AgentRunResult,
+  IAgent
+} from "../src/agents/agent.js";
 import type { CodexGateway, CodexTurnRequest } from "../src/codex/codex-client.js";
 import {
   DecisionSource,
@@ -36,6 +42,24 @@ class FakeGateway implements CodexGateway {
   async runTurn(request: CodexTurnRequest) {
     this.requests.push(request);
     return this.eventFactory(request);
+  }
+}
+
+class FakeAgent implements IAgent {
+  readonly provider = "claude" as const;
+  requests: AgentRunRequest[] = [];
+
+  constructor(private readonly result: AgentRunResult) {}
+
+  optionsSnapshot() {
+    return {
+      agentProvider: this.provider
+    };
+  }
+
+  async run(request: AgentRunRequest, _observer?: AgentRunObserver) {
+    this.requests.push(request);
+    return this.result;
   }
 }
 
@@ -188,6 +212,62 @@ describe("evaluateStepArtifact", () => {
     expect(gateway.requests[0]?.prompt).toContain("The summary mentions shipped features.");
     expect(gateway.requests[0]?.prompt).toContain("Codex wrote the release summary.");
     expect(gateway.requests[0]?.prompt).toContain("Final report content.");
+  });
+
+  it("uses configured agent structured output for evaluator verdicts", async () => {
+    const agent = new FakeAgent({
+      provider: "claude",
+      sessionId: "claude-session-1",
+      threadId: "claude-session-1",
+      finalResponse: "",
+      usage: {},
+      structuredOutput: {
+        verdict: DecisionVerdict.APPROVE,
+        comment: "Structured verdict is valid."
+      }
+    });
+
+    const result = await evaluateStepArtifact(baseInput(StepRunEvaluator.EVALUATOR_REVIEW), {
+      agent,
+      timeoutMs: 1_000
+    });
+
+    expect(result).toEqual({
+      decisions: [
+        {
+          stepRunId: "step-run-1",
+          source: DecisionSource.EVALUATOR,
+          verdict: DecisionVerdict.APPROVE,
+          comment: "Structured verdict is valid."
+        }
+      ],
+      finalVerdict: DecisionVerdict.APPROVE
+    });
+    expect(agent.requests).toHaveLength(1);
+    expect(agent.requests[0]).toMatchObject({
+      purpose: "step_evaluation",
+      permissionProfile: "read-only",
+      workingDirectory: process.cwd(),
+      outputSchema: EVALUATOR_OUTPUT_SCHEMA,
+      timeoutMs: 1_000
+    });
+  });
+
+  it("fails when configured agent returns no structured output and invalid final JSON", async () => {
+    const agent = new FakeAgent({
+      provider: "claude",
+      sessionId: "claude-session-1",
+      threadId: "claude-session-1",
+      finalResponse: "not-json",
+      usage: {}
+    });
+
+    await expect(
+      evaluateStepArtifact(baseInput(StepRunEvaluator.EVALUATOR_REVIEW), {
+        agent,
+        timeoutMs: 1_000
+      })
+    ).rejects.toMatchObject({ code: "evaluator_invalid_json" });
   });
 
   it("keeps mixed evaluator approval pending for human review", async () => {

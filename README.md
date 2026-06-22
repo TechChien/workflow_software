@@ -1,6 +1,6 @@
 # Workflow Software
 
-UI-first, YAML-backed workflow builder for designing and running Codex-powered workflows.
+UI-first, YAML-backed workflow builder for designing and running agent-powered workflows.
 
 Users compose workflows in a visual UI. The UI produces canonical YAML, publishes immutable workflow versions, and runs published versions through a separate worker service.
 
@@ -9,7 +9,7 @@ Users compose workflows in a visual UI. The UI produces canonical YAML, publishe
 ```text
 workflow_software/
   ui/       Next.js frontend. Calls worker REST APIs only.
-  worker/   Backend API, runtime worker, Prisma, Codex SDK, artifacts, worktrees.
+  worker/   Backend API, runtime worker, Prisma, agent executors, artifacts, worktrees.
   shared/   Zod schemas, shared types, constants, and YAML helpers.
   infra/    Local infrastructure and environment examples.
   docs/     Architecture notes and example workflow YAML.
@@ -21,7 +21,7 @@ workflow_software/
 - Package manager: pnpm workspace.
 - UI: Next.js + React Flow / xyflow.
 - Worker: TypeScript service with REST API and Postgres polling.
-- Runtime agent: `@openai/codex-sdk`.
+- Runtime agent: strategy-selected `ClaudeCodeAgent` or `CodexAgent`; defaults to Claude Code via `@anthropic-ai/claude-agent-sdk`.
 - Database: PostgreSQL with Prisma owned by `worker/`.
 - Shared contracts: Zod schemas in `shared/`.
 - Formal artifacts: written by the worker under `data/artifacts/`.
@@ -94,6 +94,19 @@ pnpm dev:worker
 
 Polling is controlled by `WORKER_POLLING_ENABLED` and `WORKER_POLL_INTERVAL_MS` in `worker/.env`.
 
+Agent execution is selected at the worker level:
+
+```bash
+AGENT_EXECUTOR=claude
+AGENT_EVALUATOR=claude
+# Optional gateway/proxy for Anthropic-compatible providers:
+ANTHROPIC_BASE_URL=https://your-anthropic-compatible-gateway.example/v1
+```
+
+Set either value to `codex` to use the Codex adapter. Claude Code auth and
+gateway variables are passed through from `worker/.env`; do not include secrets
+inside persisted workflow data.
+
 Run the UI:
 
 ```bash
@@ -106,7 +119,7 @@ Run the worker API and poller:
 pnpm dev:worker
 ```
 
-Run the opt-in workspace integration test with a real DB client and Codex executor:
+Run the opt-in workspace integration test with a real DB client and executor:
 
 ```powershell
 $env:RUN_WORKSPACE_INTEGRATION="true"
@@ -145,7 +158,7 @@ pnpm typecheck
 - Artifacts are immutable; reruns create new versions.
 - Downstream step runs record the exact artifact versions they consumed.
 - Optional context paths are worktree-relative and skipped when missing or inaccessible.
-- Codex does not write the artifact store directly; the worker persists formal artifacts.
+- The runtime agent does not write the artifact store directly; the worker persists formal artifacts.
 
 ## Useful Files
 

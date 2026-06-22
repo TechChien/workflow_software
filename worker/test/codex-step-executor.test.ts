@@ -503,7 +503,7 @@ describe("executeStepRunWithCodexCore", () => {
         sequence: 1,
         kind: "turn.failed",
         status: "failed",
-        payload: { message: "model failed" }
+        payload: { agentProvider: "codex", message: "model failed" }
       }
     ]);
     expect(recorder.failed?.failure).toEqual({

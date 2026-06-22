@@ -1,4 +1,3 @@
-import type { Usage } from "@openai/codex-sdk";
 import type { CodexInteractionKind } from "@workflow-software/shared";
 
 export type CodexStepRunSource = {
@@ -35,7 +34,7 @@ export interface CodexRunRecorder {
   markCompleted(input: {
     stepRunId: string;
     finalResponse: string;
-    usage: Usage;
+    usage: Record<string, unknown>;
   }): Promise<void>;
   markFailed(stepRunId: string, failure: CodexRunFailure): Promise<void>;
 }

@@ -148,7 +148,7 @@ export class StepRunnerOrchestrator {
         artifactStoreRoot
       });
 
-      console.log("[runtime.step-runner] codex_executor.start", {
+      console.log("[runtime.step-runner] agent_executor.start", {
         workflowRunId: stepRun.workflowRunId,
         stepRunId: stepRun.id,
         stepId: step.id,
@@ -162,7 +162,7 @@ export class StepRunnerOrchestrator {
           ? { runtimeContext: artifactSession.runtimeContext }
           : {})
       });
-      console.log("[runtime.step-runner] codex_executor.complete", {
+      console.log("[runtime.step-runner] agent_executor.complete", {
         workflowRunId: stepRun.workflowRunId,
         stepRunId: stepRun.id,
         threadId:

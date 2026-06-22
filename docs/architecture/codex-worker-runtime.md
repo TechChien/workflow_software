@@ -1,9 +1,9 @@
-# Codex Worker Runtime
+# Agent Worker Runtime
 
 ## Prompt ownership
 
 `WorkflowVersion.yamlSnapshot` is the immutable design source for `steps[].prompt`.
-Before a Codex turn starts, the worker verifies the snapshot hash, resolves the
+Before an agent turn starts, the worker verifies the snapshot hash, resolves the
 matching `stepId`, and rejects empty prompts.
 
 When a step has no runtime context, the exact submitted prompt is copied to
@@ -12,14 +12,16 @@ or `output_artifacts`, the worker wraps the submitted prompt with a runtime
 contract and stores that effective prompt in `StepRun.promptSnapshot`.
 
 `CodexInteractionEvent` is not a prompt source. It is an ordered, reduced event
-ledger for a running Codex turn.
+ledger for a running agent turn. The table and `StepRun.codex*` fields keep their
+legacy names for schema compatibility; provider metadata is stored in JSON
+payloads such as `codexOptions` and interaction events.
 
 ## Artifact contract
 
 `steps[].output_artifacts` is authoritative. Prompt-mentioned filenames are
 instructions only when they match the declared outputs. If the prompt names a
 different output file, asks for extra files, or omits the declared filenames, the
-worker still instructs Codex to write only the declared artifact files.
+worker still instructs the runtime agent to write only the declared artifact files.
 
 Before the Codex turn, the runner stages paths under:
 
@@ -29,13 +31,13 @@ Before the Codex turn, the runner stages paths under:
   outputs/<declared filename>
 ```
 
-Accepted upstream artifacts are materialized into `inputs/` and passed to Codex
+Accepted upstream artifacts are materialized into `inputs/` and passed to the agent
 as input artifact paths. Resolved `context_paths` may point inside or outside the
 working directory; they are passed as context paths and their directories are
-added to Codex `additionalDirectories`. Declared outputs are passed as exact
+added to the agent access list. Declared outputs are passed as exact
 output paths.
 
-After Codex completes, the runner reads only the declared output paths. Extra
+After the agent completes, the runner reads only the declared output paths. Extra
 files are ignored as workspace side effects. If any declared output is missing,
 the step fails with `artifact_output_missing` and downstream steps are not readied.
 When all declared outputs exist, the runner writes `ArtifactVersion` rows as
@@ -44,7 +46,7 @@ can be consumed by downstream `input_artifacts`.
 
 ## Checkpointed reruns
 
-Before each Codex turn, the worker records the worktree `HEAD` in
+Before each agent turn, the worker records the worktree `HEAD` in
 `StepRun.beforeCommit` and creates a candidate `CodeChangeRecord`. If a step
 sets `evaluate.rerun: true` and its artifacts are rejected, the worker resets the
 dedicated worktree to `beforeCommit`, marks candidate artifacts as `SUPERSEDED`,
@@ -59,10 +61,29 @@ When a step is finally accepted, source changes are committed in the dedicated
 worktree and `StepRun.afterCommit` is recorded. Runtime files under
 `.workflow-runtime` are excluded from approved source commits.
 
-## SDK usage
+## Agent strategy and SDK usage
 
-The worker pins `@openai/codex-sdk` to `0.136.0`. The SDK starts the bundled Codex
-CLI and exposes its non-interactive JSONL event stream.
+Step execution and evaluator turns run through an `IAgent` strategy. Worker env
+selects the provider:
+
+```txt
+AGENT_EXECUTOR=claude|codex
+AGENT_EVALUATOR=claude|codex
+```
+
+Both default to `claude`. `ClaudeCodeAgent` uses
+`@anthropic-ai/claude-agent-sdk`; `CodexAgent` keeps the existing
+`@openai/codex-sdk` path.
+
+Claude Code gateway/proxy routing is configured with `ANTHROPIC_BASE_URL`.
+When Claude subprocess env overrides are required, the worker passes
+`{ ...process.env, ...overrides }` because the SDK `env` option replaces the
+subprocess environment. Persisted `codexOptions` record only non-secret metadata
+such as provider, model, effort, permission mode, tool lists, and whether an
+Anthropic base URL was configured.
+
+The Codex adapter pins `@openai/codex-sdk` to `0.136.0`. The SDK starts the
+bundled Codex CLI and exposes its non-interactive JSONL event stream.
 
 Every `agent` and `code_agent` turn uses:
 
@@ -140,6 +161,9 @@ incur API cost.
 
 Official references:
 
+- https://code.claude.com/docs/en/env-vars
+- https://code.claude.com/docs/en/agent-sdk/structured-outputs
+- https://code.claude.com/docs/en/agent-sdk/permissions
 - https://developers.openai.com/codex/sdk
 - https://developers.openai.com/codex/auth
 - https://developers.openai.com/codex/app-server
