@@ -147,6 +147,36 @@ describe("ClaudeCodeAgent", () => {
     }
   });
 
+  it("uses request-level model and effort overrides", async () => {
+    const captured: { request?: ClaudeQueryRequest } = {};
+    const queryFn = ((request: ClaudeQueryRequest) => {
+      captured.request = request;
+      return queryFrom([successMessage()]);
+    }) as ClaudeQuery;
+    const agent = new ClaudeCodeAgent(
+      baseSettings({
+        model: "claude-default-model",
+        effort: "low"
+      }),
+      queryFn
+    );
+
+    await agent.run({
+      purpose: "step_execution",
+      permissionProfile: "workspace-write",
+      prompt: "Implement the step.",
+      workingDirectory: process.cwd(),
+      model: "claude-override-model",
+      effort: "high",
+      timeoutMs: 1_000
+    });
+
+    expect(captured.request?.options).toMatchObject({
+      model: "claude-override-model",
+      effort: "high"
+    });
+  });
+
   it("uses read-only evaluator options and returns structured output", async () => {
     const schema = {
       type: "object",

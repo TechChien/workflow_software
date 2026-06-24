@@ -186,14 +186,16 @@ export class ClaudeCodeAgent implements IAgent {
   private optionsFor(request: AgentRunRequest): Options {
     const readOnly = request.permissionProfile === "read-only";
     const env = this.processEnv();
+    const model = request.model ?? this.settings.model;
+    const effort = request.effort ?? this.settings.effort;
 
     return {
       cwd: request.workingDirectory,
       ...(request.additionalDirectories?.length
         ? { additionalDirectories: request.additionalDirectories }
         : {}),
-      ...(this.settings.model ? { model: this.settings.model } : {}),
-      ...(this.settings.effort ? { effort: this.settings.effort } : {}),
+      ...(model ? { model } : {}),
+      ...(effort ? { effort } : {}),
       allowedTools: readOnly
         ? [...CLAUDE_EVALUATOR_ALLOWED_TOOLS]
         : this.settings.allowedTools,

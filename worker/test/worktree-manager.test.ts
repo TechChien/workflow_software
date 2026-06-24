@@ -29,6 +29,10 @@ describe("createRunWorktree", () => {
         return `${baseCommit}\n`;
       }
 
+      if (args.slice(-3).join(" ") === "rev-parse --abbrev-ref HEAD") {
+        return "feature/test\n";
+      }
+
       return "";
     });
 
@@ -46,7 +50,7 @@ describe("createRunWorktree", () => {
       workflowRunId: "workflow/run 1",
       repoPath: gitRepoPath,
       baseRef: "main",
-      worktreePath: path.join(worktreeRoot, "run-workflow-run-1"),
+      worktreePath: path.join(worktreeRoot, "workflow-run-1-feature-test-repo"),
       baseCommit
     });
 
@@ -65,10 +69,17 @@ describe("createRunWorktree", () => {
     expect(runGit).toHaveBeenCalledWith([
       "-C",
       gitRepoPath,
+      "rev-parse",
+      "--abbrev-ref",
+      "HEAD"
+    ]);
+    expect(runGit).toHaveBeenCalledWith([
+      "-C",
+      gitRepoPath,
       "worktree",
       "add",
       "--detach",
-      path.join(worktreeRoot, "run-workflow-run-1"),
+      path.join(worktreeRoot, "workflow-run-1-feature-test-repo"),
       baseCommit
     ]);
   });

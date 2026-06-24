@@ -259,6 +259,34 @@ describe("executeStepRunWithCodexCore", () => {
     expect(result.threadId).toBe("thread-1");
   });
 
+  it("applies per-step Codex model, reasoning effort, and timeout overrides", async () => {
+    const recorder = new MemoryRecorder(sourceFor("Use per-step options."));
+    const gateway = new FakeGateway(() => eventStream(...successfulEvents()));
+
+    await executeStepRunWithCodexCore(
+      {
+        stepRunId: "step-run-options",
+        workingDirectory: process.cwd(),
+        agentOptions: {
+          model: "codex-override-model",
+          reasoning_effort: "low",
+          timeout_ms: 2_500
+        }
+      },
+      dependencies(recorder, gateway)
+    );
+
+    expect(gateway.requests[0]?.threadOptions).toMatchObject({
+      model: "codex-override-model",
+      modelReasoningEffort: "low"
+    });
+    expect(recorder.started?.codexOptions).toMatchObject({
+      model: "codex-override-model",
+      modelReasoningEffort: "low",
+      timeoutMs: 2_500
+    });
+  });
+
   it("adds acceptance criteria from the published workflow step", async () => {
     const recorder = new MemoryRecorder(
       sourceFor("Write the release summary.", "agent", [

@@ -10,7 +10,10 @@ import type { StepRunnerRepository } from "./step-runner-repository.js";
 import type { StepRunnerResult } from "./step-runner.js";
 import type { StepArtifactRuntime } from "./step-artifact-runtime.js";
 import type { StepCheckpointRuntime } from "./step-checkpoint-runtime.js";
-import type { WorkspaceResolver } from "./workspace-resolver.js";
+import {
+  resolveGeneratedWorkingDirectory,
+  type WorkspaceResolver
+} from "./workspace-resolver.js";
 import {
   allWorkflowStepsAccepted,
   eligibleDependentStepIds,
@@ -112,14 +115,19 @@ export class StepRunnerOrchestrator {
         stepRun.workflowRunId,
         this.dependencies.now()
       );
-      const workingDirectory = await this.dependencies.workspaceResolver.resolve({
+      const worktreePath = await this.dependencies.workspaceResolver.resolve({
         stepRunId: stepRun.id,
         workflowRunId: stepRun.workflowRunId,
         codeWorkspaceId: stepRun.codeWorkspaceId
       });
+      const workingDirectory = await resolveGeneratedWorkingDirectory({
+        stepRunId: stepRun.id,
+        worktreePath
+      });
       console.log("[runtime.step-runner] working_directory.ready", {
         workflowRunId: stepRun.workflowRunId,
         stepRunId: stepRun.id,
+        worktreePath,
         workingDirectory
       });
       const beforeCommit = await this.dependencies.checkpointRuntime.recordBefore({
@@ -158,6 +166,7 @@ export class StepRunnerOrchestrator {
       const executionResult = await this.dependencies.executeStepRun({
         stepRunId: stepRun.id,
         workingDirectory,
+        ...(step.agent?.options ? { agentOptions: step.agent.options } : {}),
         ...(artifactSession.runtimeContext
           ? { runtimeContext: artifactSession.runtimeContext }
           : {})

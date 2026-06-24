@@ -6,7 +6,7 @@ import {
 } from "./codex-step-executor.js";
 
 export async function executeStepRunWithAgent(input: ExecuteStepRunWithCodexInput) {
-  const runtime = createExecutorAgentRuntime();
+  const runtime = createExecutorAgentRuntime(input.agentOptions?.provider);
 
   return executeStepRunWithAgentCore(input, {
     ...runtime,

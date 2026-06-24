@@ -1,9 +1,16 @@
+import { stat } from "node:fs/promises";
+import path from "node:path";
 import type { Prisma } from "../generated/prisma/client.js";
 
 export type StepWorkingDirectoryInput = {
   stepRunId: string;
   workflowRunId: string;
   codeWorkspaceId: string | null;
+};
+
+export type StepWorkingDirectoryResolutionInput = {
+  stepRunId: string;
+  worktreePath: string;
 };
 
 export type WorkspaceResolverClient = {
@@ -13,6 +20,38 @@ export type WorkspaceResolverClient = {
     } | null>;
   };
 };
+
+async function assertDirectory(input: {
+  stepRunId: string;
+  label: string;
+  directory: string;
+}) {
+  try {
+    const info = await stat(input.directory);
+    if (!info.isDirectory()) {
+      throw new Error("path is not a directory");
+    }
+  } catch (error) {
+    throw new Error(
+      `StepRun ${input.stepRunId} ${input.label} is missing or is not a directory: ${input.directory}`,
+      { cause: error }
+    );
+  }
+}
+
+export async function resolveGeneratedWorkingDirectory(
+  input: StepWorkingDirectoryResolutionInput
+) {
+  const worktreePath = path.resolve(input.worktreePath);
+
+  await assertDirectory({
+    stepRunId: input.stepRunId,
+    label: "generated working_directory",
+    directory: worktreePath
+  });
+
+  return worktreePath;
+}
 
 export type WorkspaceResolver = {
   resolve(input: StepWorkingDirectoryInput): Promise<string>;

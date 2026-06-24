@@ -119,11 +119,17 @@ export class CodexAgent implements IAgent {
   }
 
   private threadOptionsFor(request: AgentRunRequest) {
+    const settings = {
+      model: request.model ?? this.settings.model,
+      modelReasoningEffort:
+        request.modelReasoningEffort ?? this.settings.modelReasoningEffort
+    };
+
     if (request.permissionProfile === "read-only") {
-      return buildCodexEvaluatorThreadOptions(request.workingDirectory, this.settings);
+      return buildCodexEvaluatorThreadOptions(request.workingDirectory, settings);
     }
 
-    return buildCodexThreadOptions(request.workingDirectory, this.settings, {
+    return buildCodexThreadOptions(request.workingDirectory, settings, {
       additionalDirectories: request.additionalDirectories
     });
   }

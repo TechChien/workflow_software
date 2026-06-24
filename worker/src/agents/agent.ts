@@ -1,4 +1,7 @@
-import type { CodexInteractionKind } from "@workflow-software/shared";
+import type {
+  CodexInteractionKind,
+  StepAgentOptions
+} from "@workflow-software/shared";
 
 export type AgentProvider = "claude" | "codex";
 export type AgentRunPurpose = "step_execution" | "step_evaluation";
@@ -13,6 +16,9 @@ export type AgentRunRequest = {
   workingDirectory: string;
   additionalDirectories?: string[];
   outputSchema?: Record<string, unknown>;
+  model?: StepAgentOptions["model"];
+  modelReasoningEffort?: StepAgentOptions["reasoning_effort"];
+  effort?: StepAgentOptions["effort"];
   timeoutMs: number;
   signal?: AbortSignal;
 };

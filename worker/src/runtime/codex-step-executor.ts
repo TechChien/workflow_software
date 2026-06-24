@@ -1,5 +1,6 @@
 import { stat } from "node:fs/promises";
 import path from "node:path";
+import type { StepAgentOptions } from "@workflow-software/shared";
 import type {
   CodexGateway,
   CodexRuntimeSettings
@@ -22,6 +23,7 @@ import { parseVerifiedWorkflowSnapshot } from "./workflow-definition.js";
 export type ExecuteStepRunWithCodexInput = {
   stepRunId: string;
   workingDirectory: string;
+  agentOptions?: StepAgentOptions;
   runtimeContext?: CodexRuntimePromptContext;
   signal?: AbortSignal;
 };
@@ -331,10 +333,12 @@ export async function executeStepRunWithAgentCore(
   input: ExecuteStepRunWithCodexInput,
   dependencies: AgentExecutorDependencies
 ): Promise<AgentExecutionResult> {
+  const timeoutMs = input.agentOptions?.timeout_ms ?? dependencies.timeoutMs;
   console.log("[runtime.agent-executor] start", {
     stepRunId: input.stepRunId,
     provider: dependencies.agent.provider,
-    workingDirectory: input.workingDirectory
+    workingDirectory: input.workingDirectory,
+    timeoutMs
   });
   await assertWorkingDirectory(input.workingDirectory);
   console.log("[runtime.agent-executor] working_directory.valid", {
@@ -379,23 +383,29 @@ export async function executeStepRunWithAgentCore(
     prompt,
     workingDirectory: input.workingDirectory,
     additionalDirectories: buildCodexAdditionalDirectories(input.runtimeContext),
-    timeoutMs: dependencies.timeoutMs
+    model: input.agentOptions?.model,
+    modelReasoningEffort: input.agentOptions?.reasoning_effort,
+    effort: input.agentOptions?.effort,
+    timeoutMs
   };
 
   await dependencies.recorder.markStarted({
     stepRunId: input.stepRunId,
     promptSnapshot: prompt,
-    codexOptions: dependencies.agent.optionsSnapshot(request)
+    codexOptions: {
+      ...dependencies.agent.optionsSnapshot(request),
+      timeoutMs
+    }
   });
   console.log("[runtime.agent-executor] recorder.mark_started", {
     stepRunId: input.stepRunId,
     provider: dependencies.agent.provider,
     promptSnapshotLength: prompt.length,
-    timeoutMs: dependencies.timeoutMs,
+    timeoutMs,
     additionalDirectories: request.additionalDirectories?.length ?? 0
   });
 
-  const abortState = createRunAbortState(input.signal, dependencies.timeoutMs);
+  const abortState = createRunAbortState(input.signal, timeoutMs);
   let sequence = 0;
   let sessionRecorded = false;
 
@@ -403,7 +413,7 @@ export async function executeStepRunWithAgentCore(
     console.log("[runtime.agent-executor] turn.start", {
       stepRunId: input.stepRunId,
       provider: dependencies.agent.provider,
-      timeoutMs: dependencies.timeoutMs
+      timeoutMs
     });
     const result = await dependencies.agent.run(
       {

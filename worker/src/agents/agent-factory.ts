@@ -13,8 +13,10 @@ export type AgentRuntime = {
   timeoutMs: number;
 };
 
-export function createExecutorAgentRuntime(): AgentRuntime {
-  return createAgentRuntime(env.AGENT_EXECUTOR);
+export function createExecutorAgentRuntime(
+  provider: AgentProvider = env.AGENT_EXECUTOR
+): AgentRuntime {
+  return createAgentRuntime(provider);
 }
 
 export function createEvaluatorAgentRuntime(): AgentRuntime {

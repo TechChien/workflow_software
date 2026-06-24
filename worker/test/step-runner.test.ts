@@ -6,6 +6,7 @@ import {
   DecisionVerdict,
   StepRunEvaluator
 } from "../src/generated/prisma/client.js";
+import type { StepDefinition } from "@workflow-software/shared";
 import type { ExecuteStepRunWithCodexInput } from "../src/runtime/codex-step-executor.js";
 import type {
   EvaluateStepInput,
@@ -163,6 +164,7 @@ class FakeRuntimeDb {
         filename?: string;
         format: "markdown" | "plain_text";
       }>;
+      agent?: StepDefinition["agent"];
     }>
   ) {
     const snapshot = canonicalizeWorkflowDefinition({
@@ -181,6 +183,7 @@ class FakeRuntimeDb {
         output_artifacts: step.outputArtifacts ?? [],
         context_paths: [],
         tool_capabilities: [],
+        agent: step.agent,
         evaluate: {
           evaluator:
             step.evaluator === StepRunEvaluator.HUMAN_REVIEW
@@ -582,7 +585,7 @@ function dependencies(
     executeStepRun: createExecutor(db),
     evaluateStep: createEvaluator(),
     checkpointRuntime: createCheckpointRuntime(db),
-    resolveWorkingDirectory: () => "C:\\repo",
+    resolveWorkingDirectory: () => path.resolve(process.cwd()),
     now: () => new Date(Date.UTC(2026, 0, 2)),
     ...overrides
   };
@@ -630,7 +633,7 @@ describe("runNextReadyStep", () => {
     expect(executions).toEqual([
       {
         stepRunId: "step-run-step-1",
-        workingDirectory: "C:\\repo"
+        workingDirectory: path.resolve(process.cwd())
       }
     ]);
     expect(evaluations).toMatchObject([
@@ -639,7 +642,7 @@ describe("runNextReadyStep", () => {
         evaluator: StepRunEvaluator.MIXED,
         workflowId: "workflow-1",
         workflowRunId: "workflow-run-1",
-        workingDirectory: "C:\\repo",
+        workingDirectory: path.resolve(process.cwd()),
         artifactStoreRoot: expect.any(String),
         codexFinalResponse: "Codex finished successfully."
       }
@@ -727,6 +730,7 @@ describe("runNextReadyStep", () => {
   });
 
   it("uses the run CodeWorkspace worktree when no working directory override is provided", async () => {
+    const worktreePath = await makeTempDirectory("run-worktree-");
     const db = new FakeRuntimeDb([
       {
         id: "step-1",
@@ -734,6 +738,7 @@ describe("runNextReadyStep", () => {
         evaluator: StepRunEvaluator.EVALUATOR_REVIEW
       }
     ]);
+    db.codeWorkspaces[0]!.worktreePath = worktreePath;
     const executions: ExecuteStepRunWithCodexInput[] = [];
 
     await expect(
@@ -745,7 +750,86 @@ describe("runNextReadyStep", () => {
       )
     ).resolves.toMatchObject({ picked: true, outcome: "accepted" });
 
-    expect(executions[0]?.workingDirectory).toBe("C:\\worktrees\\workflow-run-1");
+    expect(executions[0]?.workingDirectory).toBe(worktreePath);
+  });
+
+  it("uses the generated worktree as working directory and forwards agent options", async () => {
+    const worktreePath = await makeTempDirectory("run-worktree-");
+    const db = new FakeRuntimeDb([
+      {
+        id: "step-1",
+        type: "agent",
+        evaluator: StepRunEvaluator.EVALUATOR_REVIEW,
+        agent: {
+          options: {
+            provider: "codex",
+            model: "codex-test-model",
+            reasoning_effort: "high",
+            timeout_ms: 1234
+          }
+        }
+      }
+    ]);
+    db.codeWorkspaces[0]!.worktreePath = worktreePath;
+    const executions: ExecuteStepRunWithCodexInput[] = [];
+    const evaluations: EvaluateStepInput[] = [];
+
+    await expect(
+      runNextReadyStep(
+        dependencies(db, {
+          executeStepRun: createExecutor(db, executions),
+          evaluateStep: createEvaluator(evaluations),
+          resolveWorkingDirectory: undefined
+        })
+      )
+    ).resolves.toMatchObject({ picked: true, outcome: "accepted" });
+
+    expect(executions[0]).toMatchObject({
+      stepRunId: "step-run-step-1",
+      workingDirectory: worktreePath,
+      agentOptions: {
+        provider: "codex",
+        model: "codex-test-model",
+        reasoning_effort: "high",
+        timeout_ms: 1234
+      }
+    });
+    expect(evaluations[0]).toMatchObject({
+      stepRunId: "step-run-step-1",
+      workingDirectory: worktreePath
+    });
+  });
+
+  it("fails before agent execution when the generated working directory is missing", async () => {
+    const worktreeRoot = await makeTempDirectory("run-worktree-root-");
+    const missingWorktreePath = path.join(worktreeRoot, "missing-worktree");
+    const db = new FakeRuntimeDb([
+      {
+        id: "step-1",
+        type: "agent",
+        evaluator: StepRunEvaluator.EVALUATOR_REVIEW
+      }
+    ]);
+    db.codeWorkspaces[0]!.worktreePath = missingWorktreePath;
+    const executions: ExecuteStepRunWithCodexInput[] = [];
+
+    await expect(
+      runNextReadyStep(
+        dependencies(db, {
+          executeStepRun: createExecutor(db, executions),
+          resolveWorkingDirectory: undefined
+        })
+      )
+    ).resolves.toMatchObject({ picked: true, outcome: "failed" });
+
+    expect(executions).toEqual([]);
+    expect(db.requireStepRun("step-run-step-1")).toMatchObject({
+      status: "FAILED",
+      codexError: expect.objectContaining({
+        message: expect.stringContaining("generated working_directory")
+      })
+    });
+    expect(db.workflowRun.status).toBe("FAILED");
   });
 
   it("executes agent + EVALUATOR_REVIEW through the evaluator approval path", async () => {

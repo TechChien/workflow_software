@@ -7,6 +7,7 @@ export type CodeWorkspaceRequest = {
   repoPath: string;
   baseRef: string;
   worktreeRoot: string;
+  worktreeName?: string;
 };
 
 export type CodeWorkspaceResult = {
@@ -40,10 +41,10 @@ function runGit(args: string[]) {
   });
 }
 
-function sanitizePathSegment(value: string) {
+function sanitizePathSegment(label: string, value: string) {
   const segment = value.replace(/[^a-zA-Z0-9._-]/g, "-");
   if (!segment) {
-    throw new Error("workflowRunId did not contain any safe path characters");
+    throw new Error(`${label} did not contain any safe path characters`);
   }
 
   return segment;
@@ -56,15 +57,24 @@ export async function createRunWorktree(
   const git = dependencies.runGit ?? runGit;
   const repoPath = path.resolve(request.repoPath);
   const worktreeRoot = path.resolve(request.worktreeRoot);
-  const worktreePath = path.join(
-    worktreeRoot,
-    `run-${sanitizePathSegment(request.workflowRunId)}`
-  );
   const gitRepoPath = (await git(["-C", repoPath, "rev-parse", "--show-toplevel"]))
     .trim();
   const baseCommit = (
     await git(["-C", gitRepoPath, "rev-parse", `${request.baseRef}^{commit}`])
   ).trim();
+  const headBranch = (
+    await git(["-C", gitRepoPath, "rev-parse", "--abbrev-ref", "HEAD"])
+  ).trim();
+  const repoName = path.basename(gitRepoPath);
+  const worktreeName = request.worktreeName ?? request.workflowRunId;
+  const worktreePath = path.join(
+    worktreeRoot,
+    [
+      sanitizePathSegment("workflowRunId", worktreeName),
+      sanitizePathSegment("headBranch", headBranch),
+      sanitizePathSegment("repoName", repoName)
+    ].join("-")
+  );
 
   await mkdir(worktreeRoot, { recursive: true });
   await git(["-C", gitRepoPath, "worktree", "add", "--detach", worktreePath, baseCommit]);

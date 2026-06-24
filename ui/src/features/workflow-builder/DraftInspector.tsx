@@ -1,6 +1,12 @@
 "use client";
 
-import { type StepDefinition } from "@workflow-software/shared";
+import {
+  AGENT_PROVIDERS,
+  CLAUDE_EFFORTS,
+  CODEX_REASONING_EFFORTS,
+  type StepAgentOptions,
+  type StepDefinition
+} from "@workflow-software/shared";
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "./Icon";
 import { lines, StatusBadge } from "./workbenchShared";
@@ -166,6 +172,145 @@ export function DraftInspector({
         </label>
       </div>
 
+      <section className="metadata-card">
+        <div className="section-heading">
+          <h2>Agent</h2>
+          <span>{step.agent?.options?.provider ?? "default"}</span>
+        </div>
+        <div className="field-grid">
+          <label className="field">
+            <FieldLabel tip={"Repository id resolved by the worker.\nLeave empty to inherit from the previous step."}>
+              Repository
+            </FieldLabel>
+            <input
+              value={step.agent?.repository_id ?? ""}
+              placeholder="default"
+              onChange={(event) =>
+                onStepChange((current) =>
+                  updateStepAgent(current, (agent) => ({
+                    ...agent,
+                    repository_id: optionalText(event.target.value)
+                  }))
+                )
+              }
+            />
+          </label>
+          <label className="field">
+            <FieldLabel tip={"Git ref for this step workspace.\nLeave empty to use the repository default or inherited ref."}>
+              Base ref
+            </FieldLabel>
+            <input
+              value={step.agent?.base_ref ?? ""}
+              placeholder="HEAD"
+              onChange={(event) =>
+                onStepChange((current) =>
+                  updateStepAgent(current, (agent) => ({
+                    ...agent,
+                    base_ref: optionalText(event.target.value)
+                  }))
+                )
+              }
+            />
+          </label>
+          <label className="field">
+            <span>Provider</span>
+            <select
+              value={step.agent?.options?.provider ?? ""}
+              onChange={(event) =>
+                onStepChange((current) =>
+                  updateStepAgentOption(
+                    current,
+                    "provider",
+                    optionalText(event.target.value) as StepAgentOptions["provider"] | undefined
+                  )
+                )
+              }
+            >
+              <option value="">Default</option>
+              {AGENT_PROVIDERS.map((provider) => (
+                <option key={provider} value={provider}>
+                  {provider}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span>Model</span>
+            <input
+              value={step.agent?.options?.model ?? ""}
+              onChange={(event) =>
+                onStepChange((current) =>
+                  updateStepAgentOption(current, "model", optionalText(event.target.value))
+                )
+              }
+            />
+          </label>
+          <label className="field">
+            <span>Codex effort</span>
+            <select
+              value={step.agent?.options?.reasoning_effort ?? ""}
+              onChange={(event) =>
+                onStepChange((current) =>
+                  updateStepAgentOption(
+                    current,
+                    "reasoning_effort",
+                    optionalText(event.target.value) as
+                      | StepAgentOptions["reasoning_effort"]
+                      | undefined
+                  )
+                )
+              }
+            >
+              <option value="">Default</option>
+              {CODEX_REASONING_EFFORTS.map((effort) => (
+                <option key={effort} value={effort}>
+                  {effort}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span>Claude effort</span>
+            <select
+              value={step.agent?.options?.effort ?? ""}
+              onChange={(event) =>
+                onStepChange((current) =>
+                  updateStepAgentOption(
+                    current,
+                    "effort",
+                    optionalText(event.target.value) as StepAgentOptions["effort"] | undefined
+                  )
+                )
+              }
+            >
+              <option value="">Default</option>
+              {CLAUDE_EFFORTS.map((effort) => (
+                <option key={effort} value={effort}>
+                  {effort}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span>Timeout ms</span>
+            <input
+              min={1}
+              type="number"
+              value={step.agent?.options?.timeout_ms ?? ""}
+              onChange={(event) =>
+                onStepChange((current) =>
+                  updateStepAgentOption(
+                    current,
+                    "timeout_ms",
+                    optionalPositiveInteger(event.target.value)
+                  )
+                )
+              }
+            />
+          </label>
+        </div>
+      </section>
+
       <label className="field">
         <FieldLabel tip={"One artifact key per line.\nExample: requirements_doc"}>
           Input artifacts
@@ -319,6 +464,77 @@ function FieldWarning({ message }: { message?: string }) {
       {message}
     </span>
   );
+}
+
+function optionalText(value: string) {
+  const trimmed = value.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+function optionalPositiveInteger(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  const parsed = Number(trimmed);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function compactAgentSettings(agent: StepDefinition["agent"]) {
+  const options = compactAgentOptions(agent?.options);
+  const repositoryId = optionalText(agent?.repository_id ?? "");
+  const baseRef = optionalText(agent?.base_ref ?? "");
+  const compacted = {
+    ...(repositoryId ? { repository_id: repositoryId } : {}),
+    ...(baseRef ? { base_ref: baseRef } : {}),
+    ...(options ? { options } : {})
+  };
+
+  return Object.keys(compacted).length > 0 ? compacted : undefined;
+}
+
+function compactAgentOptions(options: StepAgentOptions | undefined) {
+  if (!options) {
+    return undefined;
+  }
+
+  const model = optionalText(options.model ?? "");
+  const compacted = {
+    ...(options.provider ? { provider: options.provider } : {}),
+    ...(model ? { model } : {}),
+    ...(options.reasoning_effort ? { reasoning_effort: options.reasoning_effort } : {}),
+    ...(options.effort ? { effort: options.effort } : {}),
+    ...(options.timeout_ms ? { timeout_ms: options.timeout_ms } : {})
+  };
+
+  return Object.keys(compacted).length > 0 ? compacted : undefined;
+}
+
+function updateStepAgent(
+  step: StepDefinition,
+  updater: (agent: NonNullable<StepDefinition["agent"]>) => StepDefinition["agent"]
+): StepDefinition {
+  const nextAgent = compactAgentSettings(updater(step.agent ?? {}));
+  const { agent: _agent, ...stepWithoutAgent } = step;
+
+  return nextAgent ? { ...stepWithoutAgent, agent: nextAgent } : stepWithoutAgent;
+}
+
+function updateStepAgentOption<
+  TKey extends keyof StepAgentOptions
+>(
+  step: StepDefinition,
+  key: TKey,
+  value: StepAgentOptions[TKey] | undefined
+) {
+  return updateStepAgent(step, (agent) => ({
+    ...agent,
+    options: {
+      ...agent.options,
+      [key]: value
+    }
+  }));
 }
 
 function formatContextPaths(contextPaths: StepDefinition["context_paths"]) {

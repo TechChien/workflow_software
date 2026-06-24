@@ -106,7 +106,7 @@ export async function registerRunRoutes(app: FastifyInstance) {
       throw notFound(`WorkflowVersion ${workflowVersionId} was not found`);
     }
 
-    const created = await createWorkflowRun(workflowVersionId, body.inputPayload);
+    const created = await createWorkflowRun(workflowVersionId, body);
     const runId = (created as { id?: unknown }).id;
 
     if (typeof runId !== "string") {

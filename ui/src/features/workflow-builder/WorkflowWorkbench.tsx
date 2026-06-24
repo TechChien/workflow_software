@@ -8,6 +8,7 @@ import {
   ReactFlowProvider
 } from "@xyflow/react";
 import { useMemo, useState } from "react";
+import type { CreateRunRequest } from "@/lib/api/api-contract";
 import { type PublishedWorkflow } from "@/mock/workflowWorkbench";
 import { useCreateWorkflowRun } from "@/services/worker-api-service";
 import { ComponentLibrary, componentTemplates } from "./ComponentLibrary";
@@ -71,7 +72,7 @@ function WorkflowWorkbenchInner() {
 
     const run = await createRunMutation.mutateAsync({
       workflowVersionId: workflow.id,
-      body: { inputPayload: {} }
+      body: createRunRequest(workflow)
     });
     runHistoryView.addRun(toRunRecord(run));
     publishedView.updateLastRunStatus(workflow.id, run.status);
@@ -134,6 +135,33 @@ function WorkflowWorkbenchInner() {
       />
     </main>
   );
+}
+
+function createRunRequest(workflow: PublishedWorkflow): CreateRunRequest {
+  const stepWorkspaces = createStepWorkspaces(workflow.workflow.steps);
+
+  return {
+    inputPayload: {},
+    stepWorkspaces
+  };
+}
+
+function createStepWorkspaces(
+  steps: PublishedWorkflow["workflow"]["steps"]
+): CreateRunRequest["stepWorkspaces"] {
+  return steps.reduce<CreateRunRequest["stepWorkspaces"]>((workspaces, step) => {
+    const repositoryId = step.agent?.repository_id?.trim();
+    const baseRef = step.agent?.base_ref?.trim();
+
+    if (repositoryId || baseRef) {
+      workspaces[step.id] = {
+        ...(repositoryId ? { repositoryId } : {}),
+        ...(baseRef ? { baseRef } : {})
+      };
+    }
+
+    return workspaces;
+  }, {});
 }
 
 function LeftWorkbenchSection({

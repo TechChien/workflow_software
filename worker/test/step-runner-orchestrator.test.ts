@@ -1,3 +1,4 @@
+import path from "node:path";
 import type { WorkflowYaml } from "@workflow-software/shared";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -72,6 +73,7 @@ function createHarness(input: {
   finalVerdict?: DecisionVerdict;
   executeStepRun?: () => Promise<unknown>;
 }) {
+  const workingDirectory = path.resolve(process.cwd());
   const stepRun = input.stepRun === undefined ? readyStepRun(StepRunEvaluator.EVALUATOR_REVIEW) : input.stepRun;
   const statuses = [{ stepId: "step-1", status: "CODEX_COMPLETED" }];
   const repository: StepRunnerRepository = {
@@ -92,7 +94,7 @@ function createHarness(input: {
     readyDownstreamStep: vi.fn(async () => undefined)
   };
   const workspaceResolver: WorkspaceResolver = {
-    resolve: vi.fn(async () => "C:\\repo")
+    resolve: vi.fn(async () => workingDirectory)
   };
   const artifactRuntime: StepArtifactRuntime = {
     prepare: vi.fn(async () => ({ enabled: false })),
@@ -208,7 +210,7 @@ describe("StepRunnerOrchestrator", () => {
     expect(checkpointRuntime.resetBeforeRerun).toHaveBeenCalledWith({
       stepRunId: "step-run-1",
       codeWorkspaceId: "workspace-1",
-      workingDirectory: "C:\\repo",
+      workingDirectory: path.resolve(process.cwd()),
       beforeCommit: "before-commit"
     });
     expect(repository.queueStepRunRerun).toHaveBeenCalledWith({
