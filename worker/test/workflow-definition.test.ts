@@ -79,6 +79,17 @@ describe("canonicalizeWorkflowDefinition", () => {
     });
   });
 
+  it("rejects legacy optional flags on context paths", () => {
+    expect(() =>
+      canonicalizeWorkflowDefinition(
+        baseWorkflow({
+          type: "code_agent",
+          context_paths: [{ path: "src", type: "directory", optional: true }]
+        })
+      )
+    ).toThrow();
+  });
+
   it("falls back to mixed for invalid evaluator settings", () => {
     const snapshot = canonicalizeWorkflowDefinition(
       baseWorkflow({

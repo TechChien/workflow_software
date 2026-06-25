@@ -22,9 +22,8 @@ export const StepArtifactInputSchema = z.object({
 
 export const ContextPathSchema = z.object({
   path: z.string().min(1),
-  type: z.enum(["file", "directory"]),
-  optional: z.boolean().default(true)
-});
+  type: z.enum(["file", "directory"])
+}).strict();
 
 export const AcceptanceCriteriaSchema = z
   .union([z.string(), z.array(z.string().min(1))])

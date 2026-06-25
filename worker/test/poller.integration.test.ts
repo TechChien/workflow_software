@@ -208,8 +208,7 @@ async function createTwoStepArtifactWorkflowRun(
         context_paths: [
           {
             path: input.contextPath,
-            type: "file",
-            optional: false
+            type: "file"
           }
         ],
         tool_capabilities: [],

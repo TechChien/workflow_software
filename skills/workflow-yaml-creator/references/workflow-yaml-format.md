@@ -74,12 +74,11 @@ Use worktree-relative paths:
 context_paths:
   - path: src
     type: directory
-    optional: true
 ```
 
 - `path`: Worktree-relative file or directory path.
 - `type`: Usually `file` or `directory`.
-- `optional`: Use `true` when the workflow can still run if the path is absent.
+- All `context_paths` are required. If a declared path is absent or has the wrong type, the step fails before the agent turn.
 
 ## Artifact Rules
 
@@ -139,7 +138,6 @@ steps:
     context_paths:
       - path: worker/src
         type: directory
-        optional: true
     tool_capabilities:
       - "*"
     prompt: |
@@ -164,7 +162,6 @@ steps:
     context_paths:
       - path: ui/src
         type: directory
-        optional: true
     tool_capabilities:
       - "*"
     prompt: |

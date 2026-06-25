@@ -35,7 +35,9 @@ Accepted upstream artifacts are materialized into `inputs/` and passed to the ag
 as input artifact paths. Resolved `context_paths` may point inside or outside the
 working directory; they are passed as context paths and their directories are
 added to the agent access list. Declared outputs are passed as exact
-output paths.
+output paths. All declared `context_paths` are required; if any path is missing,
+inaccessible, or has the wrong declared type, the step fails with
+`context_path_required_unavailable` before the agent turn starts.
 
 After the agent completes, the runner reads only the declared output paths. Extra
 files are ignored as workspace side effects. If any declared output is missing,

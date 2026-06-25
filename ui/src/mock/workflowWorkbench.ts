@@ -88,7 +88,7 @@ export const sampleSteps: StepDefinition[] = [
     output_artifacts: [
       { artifact: "g2_backend_gap_summary", filename: "backend-gap-summary.md", format: "markdown" }
     ],
-    context_paths: [{ path: "worker/src", type: "directory", optional: true }],
+    context_paths: [{ path: "worker/src", type: "directory" }],
     tool_capabilities: ["*"],
     evaluate: { evaluator: "human_review", rerun: true },
     prompt: "Inspect backend workflow runtime gaps using the accepted requirements.",
@@ -108,7 +108,7 @@ export const sampleSteps: StepDefinition[] = [
     output_artifacts: [
       { artifact: "g3_ui_gap_summary", filename: "ui-gap-summary.md", format: "markdown" }
     ],
-    context_paths: [{ path: "ui/src", type: "directory", optional: true }],
+    context_paths: [{ path: "ui/src", type: "directory" }],
     tool_capabilities: ["*"],
     evaluate: { evaluator: "human_review", rerun: true },
     prompt: "Inspect workflow builder UI gaps using the accepted requirements.",

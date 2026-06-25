@@ -218,7 +218,7 @@ describe("artifact runtime", () => {
       stepRunId: "step-run-2",
       step: stepDefinition({
         input_artifacts: [{ artifact: "summary", required: true }],
-        context_paths: [{ path: "src/notes.md", type: "file", optional: false }],
+        context_paths: [{ path: "src/notes.md", type: "file" }],
         output_artifacts: [
           {
             artifact: "downstream",
@@ -245,6 +245,33 @@ describe("artifact runtime", () => {
       stepRunId: "step-run-2",
       path: "src/notes.md",
       status: "resolved"
+    });
+  });
+
+  it("fails when a declared context path is unavailable", async () => {
+    const db = new FakeArtifactRuntimeDb();
+
+    await expect(
+      prepareCodexRuntimeContext({
+        client: db.client(),
+        workflowId: "workflow-1",
+        workflowRunId: "workflow-run-1",
+        stepRunId: "step-run-1",
+        step: stepDefinition({
+          context_paths: [{ path: "missing.md", type: "file" }]
+        }),
+        workingDirectory,
+        artifactStoreRoot
+      })
+    ).rejects.toMatchObject({
+      code: "context_path_required_unavailable",
+      message: "Required context path missing.md is unavailable: path_missing_or_inaccessible"
+    });
+    expect(db.contextPathEvents[0]).toMatchObject({
+      stepRunId: "step-run-1",
+      path: "missing.md",
+      status: "skipped",
+      reason: "path_missing_or_inaccessible"
     });
   });
 });

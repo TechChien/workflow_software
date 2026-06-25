@@ -152,13 +152,10 @@ async function prepareContextPaths(input: {
     await recordContextPath(input.client, input.stepRunId, result);
 
     if (result.status === "skipped") {
-      if (!contextPath.optional) {
-        throw new ArtifactRuntimeError(
-          "context_path_required_unavailable",
-          `Required context path ${contextPath.path} is unavailable: ${result.reason}`
-        );
-      }
-      continue;
+      throw new ArtifactRuntimeError(
+        "context_path_required_unavailable",
+        `Required context path ${contextPath.path} is unavailable: ${result.reason}`
+      );
     }
 
     prepared.push({

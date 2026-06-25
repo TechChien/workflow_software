@@ -252,11 +252,10 @@ export function lines(value: string) {
 
 export function parseContextPaths(value: string): ContextPath[] {
   return lines(value).map((line) => {
-    const [path, type, optional] = line.split("|").map((part) => part.trim());
+    const [path, type] = line.split("|").map((part) => part.trim());
     return {
       path: path || "src",
-      type: type === "file" ? "file" : "directory",
-      optional: optional !== "required"
+      type: type === "file" ? "file" : "directory"
     };
   });
 }

@@ -366,7 +366,7 @@ export function DraftInspector({
       </label>
 
       <label className="field">
-        <FieldLabel tip={"One path per line as path|type|requiredness.\nType: file or directory.\nRequiredness: required or optional.\nExample: src|directory|required"}>
+        <FieldLabel tip={"One path per line as path|type.\nType: file or directory.\nExample: src|directory"}>
           Context paths
         </FieldLabel>
         <textarea
@@ -539,7 +539,7 @@ function updateStepAgentOption<
 
 function formatContextPaths(contextPaths: StepDefinition["context_paths"]) {
   return contextPaths
-    .map((contextPath) => `${contextPath.path}|${contextPath.type}|${contextPath.optional ? "optional" : "required"}`)
+    .map((contextPath) => `${contextPath.path}|${contextPath.type}`)
     .join("\n");
 }
 
@@ -579,24 +579,22 @@ function validateContextPaths(value: string) {
 
   for (const line of pathLines) {
     const parts = line.split("|").map((part) => part.trim());
-    const [path, type, requiredness] = parts;
+    const [path, type] = parts;
 
     if (
-      parts.length !== 3 ||
+      parts.length !== 2 ||
       !path ||
-      !["file", "directory"].includes(type) ||
-      !["required", "optional"].includes(requiredness)
+      !["file", "directory"].includes(type)
     ) {
       return {
-        warning: `Ignored invalid context path: "${line}". Use path|file or directory|required or optional.`,
+        warning: `Ignored invalid context path: "${line}". Use path|file or directory.`,
         value: []
       };
     }
 
     contextPaths.push({
       path,
-      type: type as StepDefinition["context_paths"][number]["type"],
-      optional: requiredness === "optional"
+      type: type as StepDefinition["context_paths"][number]["type"]
     });
   }
 

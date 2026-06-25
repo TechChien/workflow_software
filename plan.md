@@ -8,7 +8,7 @@
   - 每個 node 最多一個 downstream node。
   - 每個 step 可讀取多個 artifact inputs。
   - 每個 step 可產生多個 named artifacts。
-- User-defined paths 是 optional external context，不是 artifact input；沒權限或不存在就略過並記錄事件。
+- User-defined paths 是 required external context，不是 artifact input；沒權限或不存在就記錄事件並讓 step 在 agent turn 前失敗。
 - Runtime 使用 TypeScript worker + `@openai/codex-sdk`，並支援 Codex permission/user-question pause。
 - Source code 修改在 dedicated git worktree 中執行，code changes 是 side effect，summary/diff 可作為 artifacts 記錄。
 
@@ -50,10 +50,8 @@ steps:
     context_paths:
       - path: src
         type: directory
-        optional: true
       - path: docs/domain-rules.md
         type: file
-        optional: true
 
     output_artifacts:
       - artifact: g2_gap_summary
@@ -65,7 +63,7 @@ steps:
       - "*"
 
     prompt: |
-      Use the accepted artifact inputs and optional context paths.
+      Use the accepted artifact inputs and required context paths.
       Produce the requested output artifacts.
 
     acceptance:
@@ -77,7 +75,7 @@ steps:
 - `upstream/downstream` express node connection only。
 - `input_artifacts` is an array。
 - `output_artifacts` is an array。
-- `context_paths` are optional worktree-relative references。
+- `context_paths` are required worktree-relative references。
 - Context paths are not versioned artifacts in MVP。
 
 ## Runtime Model
@@ -97,8 +95,8 @@ steps:
 - Context path behavior:
   - Paths are worktree-relative only。
   - Files and directories are supported。
-  - If worker cannot resolve/stat a path, skip and log。
-  - If Codex requests permission for optional context access, auto-skip and resume same Codex thread。
+  - If worker cannot resolve/stat a path, log the context path event and fail the step before the agent turn。
+  - Context path access is required; auto-skip behavior was removed from the current flow。
 - Artifact persistence:
   - Codex does not write artifact store directly。
   - Worker stores Codex final output under managed artifact root。
@@ -140,8 +138,8 @@ steps:
 - Step with multiple `input_artifacts` passes validation。
 - Step with multiple `output_artifacts` creates multiple artifact versions。
 - Step run records every consumed artifact version id。
-- Missing/inaccessible context path is skipped and logged。
-- Codex permission request for optional context path is auto-skipped and resumed。
+- Missing/inaccessible context path is logged and fails the step。
+- Declared context paths are required before the agent turn starts。
 - Rerun creates new artifact versions without overwriting old ones。
 - Downstream step becomes stale only when it consumed an older accepted artifact version。
 - Code step runs in dedicated git worktree and records diff/commit metadata。
@@ -152,7 +150,7 @@ steps:
 - MVP is single workspace, no login/RBAC。
 - Workflow graph is linear by node connection。
 - Artifact inputs/outputs can be multiple per step。
-- User-defined paths are optional external context, not formal artifacts。
+- User-defined paths are required external context, not formal artifacts。
 - Context paths are worktree-relative files/directories only。
 - Formal artifact content is text-first。
 - Code-modifying steps require human review before commit。

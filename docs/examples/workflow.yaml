@@ -38,7 +38,6 @@ steps:
     context_paths:
       - path: worker/src
         type: directory
-        optional: true
     tool_capabilities:
       - "*"
     prompt: |
@@ -63,7 +62,6 @@ steps:
     context_paths:
       - path: ui/src
         type: directory
-        optional: true
     tool_capabilities:
       - "*"
     prompt: |

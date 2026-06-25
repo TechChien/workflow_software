@@ -806,7 +806,7 @@ components:
 
     ContextPath:
       type: object
-      required: [path, type, optional]
+      required: [path, type]
       properties:
         path:
           type: string
@@ -814,9 +814,6 @@ components:
         type:
           type: string
           enum: [file, directory]
-        optional:
-          type: boolean
-          default: true
 
     CreateWorkflowRequest:
       type: object

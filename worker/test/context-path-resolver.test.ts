@@ -29,13 +29,11 @@ describe("resolveContextPath", () => {
     await expect(
       resolveContextPath(workingDirectory, {
         path: externalFile,
-        type: "file",
-        optional: false
+        type: "file"
       })
     ).resolves.toEqual({
       path: externalFile,
       type: "file",
-      optional: false,
       status: "resolved",
       absolutePath: externalFile
     });
@@ -45,32 +43,28 @@ describe("resolveContextPath", () => {
     await expect(
       resolveContextPath(workingDirectory, {
         path: "../external-context",
-        type: "directory",
-        optional: false
+        type: "directory"
       })
     ).resolves.toEqual({
       path: "../external-context",
       type: "directory",
-      optional: false,
       status: "resolved",
       absolutePath: externalDirectory
     });
   });
 
-  it("still rejects paths with the wrong declared type", async () => {
+  it("reports paths with the wrong declared type as skipped", async () => {
     const externalFile = path.join(externalDirectory, "notes.md");
     await writeFile(externalFile, "external context", "utf8");
 
     await expect(
       resolveContextPath(workingDirectory, {
         path: externalFile,
-        type: "directory",
-        optional: true
+        type: "directory"
       })
     ).resolves.toMatchObject({
       path: externalFile,
       type: "directory",
-      optional: true,
       status: "skipped",
       reason: "path_type_mismatch"
     });
