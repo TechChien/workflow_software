@@ -22,6 +22,7 @@ export type StepArtifactRuntime = {
     step: StepDefinition;
     workingDirectory: string;
     artifactStoreRoot: string;
+    inputPayload?: Record<string, unknown>;
   }): Promise<StepArtifactRuntimeSession>;
   persistDeclaredOutputs(input: {
     session: StepArtifactRuntimeSession;
@@ -70,6 +71,7 @@ export class DefaultStepArtifactRuntime implements StepArtifactRuntime {
     step: StepDefinition;
     workingDirectory: string;
     artifactStoreRoot: string;
+    inputPayload?: Record<string, unknown>;
   }): Promise<StepArtifactRuntimeSession> {
     const enabled = stepNeedsArtifactRuntime(input.step);
     console.log("[runtime.step-runner] artifact_runtime", {
@@ -93,7 +95,8 @@ export class DefaultStepArtifactRuntime implements StepArtifactRuntime {
       stepRunId: input.stepRunId,
       step: input.step,
       workingDirectory: input.workingDirectory,
-      artifactStoreRoot: input.artifactStoreRoot
+      artifactStoreRoot: input.artifactStoreRoot,
+      inputPayload: input.inputPayload
     });
 
     console.log("[runtime.step-runner] runtime_context.ready", {

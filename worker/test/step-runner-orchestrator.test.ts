@@ -60,6 +60,9 @@ function readyStepRun(
     codeWorkspaceId: "workspace-1",
     beforeCommit: null,
     workflowRun: {
+      inputPayload: {
+        requirementsPath: "docs/requirements"
+      },
       workflowVersion: {
         workflowId: "workflow-1",
         ...snapshotFor({ id: "step-1", rerun: options.rerun })
@@ -181,6 +184,22 @@ describe("StepRunnerOrchestrator", () => {
       new Date(Date.UTC(2026, 0, 2))
     );
     expect(artifactRuntime.acceptProduced).toHaveBeenCalled();
+  });
+
+  it("passes the workflow run input payload to artifact preparation", async () => {
+    const { orchestrator, artifactRuntime } = createHarness({});
+
+    await expect(orchestrator.runNextReadyStep()).resolves.toMatchObject({
+      picked: true,
+      outcome: "accepted"
+    });
+    expect(artifactRuntime.prepare).toHaveBeenCalledWith(
+      expect.objectContaining({
+        inputPayload: {
+          requirementsPath: "docs/requirements"
+        }
+      })
+    );
   });
 
   it("rejects non-approved evaluation results and fails the workflow", async () => {

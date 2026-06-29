@@ -50,6 +50,14 @@ function approvedStepCommitMessage(stepId: string, stepRunId: string) {
   return `Approve workflow step ${stepId} (${stepRunId})`;
 }
 
+function inputPayloadRecord(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  return value as Record<string, unknown>;
+}
+
 export class StepRunnerOrchestrator {
   private readonly errorHandler: StepRunnerErrorHandler;
 
@@ -153,7 +161,8 @@ export class StepRunnerOrchestrator {
         stepRunId: stepRun.id,
         step,
         workingDirectory,
-        artifactStoreRoot
+        artifactStoreRoot,
+        inputPayload: inputPayloadRecord(stepRun.workflowRun.inputPayload)
       });
 
       console.log("[runtime.step-runner] agent_executor.start", {

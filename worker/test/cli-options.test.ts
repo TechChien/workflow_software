@@ -42,6 +42,25 @@ describe("parseCliArgs", () => {
     });
   });
 
+  it.each(["--input-payload", "--inputPayload"])(
+    "parses input payload JSON objects from %s",
+    (option) => {
+      expect(
+        parseCliArgs([
+          "workflow.yaml",
+          option,
+          "{\"requirementsPath\":\"docs/requirements\"}"
+        ])
+      ).toEqual({
+        help: false,
+        workflowPath: "workflow.yaml",
+        inputPayload: {
+          requirementsPath: "docs/requirements"
+        }
+      });
+    }
+  );
+
   it("parses repo path", () => {
     expect(parseCliArgs(["workflow.yaml", "--repo-path", "C:\\repo"])).toEqual({
       help: false,

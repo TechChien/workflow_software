@@ -274,4 +274,49 @@ describe("artifact runtime", () => {
       reason: "path_missing_or_inaccessible"
     });
   });
+
+  it("uses input payload context paths as requirements entrypoints", async () => {
+    const db = new FakeArtifactRuntimeDb();
+    const requirementsDirectory = path.join(workingDirectory, "docs", "requirements");
+    await mkdir(requirementsDirectory, { recursive: true });
+    await writeFile(
+      path.join(requirementsDirectory, "request.md"),
+      "Original request",
+      "utf8"
+    );
+
+    const runtimeContext = await prepareCodexRuntimeContext({
+      client: db.client(),
+      workflowId: "workflow-1",
+      workflowRunId: "workflow-run-1",
+      stepRunId: "step-run-1",
+      step: stepDefinition({
+        context_paths: [
+          {
+            path: "${inputPayload.requirementsPath}",
+            type: "directory"
+          }
+        ]
+      }),
+      workingDirectory,
+      artifactStoreRoot,
+      inputPayload: {
+        requirementsPath: "docs/requirements"
+      }
+    });
+
+    expect(runtimeContext.contextPaths).toEqual([
+      {
+        path: "docs/requirements",
+        type: "directory",
+        absolutePath: requirementsDirectory,
+        promptPath: "docs/requirements"
+      }
+    ]);
+    expect(db.contextPathEvents[0]).toMatchObject({
+      stepRunId: "step-run-1",
+      path: "docs/requirements",
+      status: "resolved"
+    });
+  });
 });

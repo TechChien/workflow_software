@@ -144,11 +144,14 @@ async function prepareContextPaths(input: {
   stepRunId: string;
   workingDirectory: string;
   contextPaths: ContextPath[];
+  inputPayload?: Record<string, unknown>;
 }) {
   const prepared: PreparedContextPath[] = [];
 
   for (const contextPath of input.contextPaths) {
-    const result = await resolveContextPath(input.workingDirectory, contextPath);
+    const result = await resolveContextPath(input.workingDirectory, contextPath, {
+      inputPayload: input.inputPayload
+    });
     await recordContextPath(input.client, input.stepRunId, result);
 
     if (result.status === "skipped") {
@@ -308,6 +311,7 @@ export async function prepareCodexRuntimeContext(input: {
   step: StepDefinition;
   workingDirectory: string;
   artifactStoreRoot: string;
+  inputPayload?: Record<string, unknown>;
 }): Promise<CodexRuntimePromptContext> {
   const runtimeRoot = runtimeRootFor(input.workingDirectory, input.stepRunId);
   const outputs = prepareOutputArtifacts({
@@ -326,7 +330,8 @@ export async function prepareCodexRuntimeContext(input: {
       client: input.client,
       stepRunId: input.stepRunId,
       workingDirectory: input.workingDirectory,
-      contextPaths: input.step.context_paths
+      contextPaths: input.step.context_paths,
+      inputPayload: input.inputPayload
     }),
     inputArtifacts: await prepareInputArtifacts({
       client: input.client,

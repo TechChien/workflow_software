@@ -12,6 +12,7 @@ export type ReadyStepRun = {
   codeWorkspaceId: string | null;
   beforeCommit: string | null;
   workflowRun: {
+    inputPayload: Prisma.JsonValue;
     workflowVersion: {
       workflowId: string;
       yamlSnapshot: string;

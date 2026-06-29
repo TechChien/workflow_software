@@ -1,5 +1,5 @@
 export const cliUsage =
-  "Usage: pnpm --filter @workflow-software/worker cli -- <workflow.yaml> [--repo-path <path>] [--input '{\"key\":\"value\"}']";
+  "Usage: pnpm --filter @workflow-software/worker cli -- <workflow.yaml> [--repo-path <path>] [--input-payload '{\"key\":\"value\"}']";
 
 export type CliOptions =
   | {
@@ -12,17 +12,17 @@ export type CliOptions =
       repoPath?: string;
     };
 
-function parseInputPayload(source: string) {
+function parseInputPayload(source: string, optionName: string) {
   let parsed: unknown;
 
   try {
     parsed = JSON.parse(source);
   } catch {
-    throw new Error("--input must be valid JSON");
+    throw new Error(`${optionName} must be valid JSON`);
   }
 
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error("--input must be a JSON object");
+    throw new Error(`${optionName} must be a JSON object`);
   }
 
   return parsed as Record<string, unknown>;
@@ -40,14 +40,14 @@ export function parseCliArgs(args: string[]): CliOptions {
       return { help: true };
     }
 
-    if (arg === "--input") {
+    if (arg === "--input" || arg === "--input-payload" || arg === "--inputPayload") {
       const source = args[index + 1];
 
       if (!source) {
-        throw new Error("--input requires a JSON object argument");
+        throw new Error(`${arg} requires a JSON object argument`);
       }
 
-      inputPayload = parseInputPayload(source);
+      inputPayload = parseInputPayload(source, arg);
       index += 1;
       continue;
     }

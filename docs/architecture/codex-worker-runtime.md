@@ -39,6 +39,11 @@ output paths. All declared `context_paths` are required; if any path is missing,
 inaccessible, or has the wrong declared type, the step fails with
 `context_path_required_unavailable` before the agent turn starts.
 
+`context_paths[].path` can also reference the workflow run input payload when the
+entire value is a placeholder such as `"${inputPayload.requirementsPath}"`.
+The payload value must be a non-empty string. Absolute paths are used directly;
+relative payload paths are resolved from the generated step worktree root.
+
 After the agent completes, the runner reads only the declared output paths. Extra
 files are ignored as workspace side effects. If any declared output is missing,
 the step fails with `artifact_output_missing` and downstream steps are not readied.

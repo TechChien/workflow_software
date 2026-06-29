@@ -81,8 +81,27 @@ pnpm --filter @workflow-software/worker cli -- docs/examples/workflow.yaml
 Pass an optional JSON input payload:
 
 ```bash
-pnpm --filter @workflow-software/worker cli -- docs/examples/workflow.yaml --input '{"key":"value"}'
+pnpm --filter @workflow-software/worker cli -- docs/examples/workflow.yaml --input-payload '{"key":"value"}'
 ```
+
+`--input` is kept as a backward-compatible alias.
+
+Workflow context paths can use run input payload values as entrypoints:
+
+```yaml
+context_paths:
+  - path: "${inputPayload.requirementsPath}"
+    type: directory
+```
+
+The CLI can then provide the requirements path:
+
+```bash
+pnpm --filter @workflow-software/worker cli -- docs/examples/workflow.yaml --input-payload '{"requirementsPath":"docs/requirements"}'
+```
+
+Absolute paths are used as-is. Relative paths are resolved from the generated
+step worktree root.
 
 The CLI canonicalizes the YAML, upserts the workflow draft, publishes an immutable workflow version, creates a workflow run, and prints JSON with the workflow, version, revision, and run IDs.
 
@@ -157,7 +176,9 @@ pnpm typecheck
 - `step.evaluate.rerun` opts a step into checkpointed reruns after rejected artifacts.
 - Artifacts are immutable; reruns create new versions.
 - Downstream step runs record the exact artifact versions they consumed.
-- Optional context paths are worktree-relative and skipped when missing or inaccessible.
+- Context paths are required before the agent turn starts.
+- Context paths may be static paths or `${inputPayload.key}` placeholders.
+- Absolute context paths are used as-is; relative context paths are resolved from the generated step worktree root.
 - The runtime agent does not write the artifact store directly; the worker persists formal artifacts.
 
 ## Useful Files

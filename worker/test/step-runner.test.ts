@@ -39,6 +39,7 @@ type WorkflowRunRow = {
   id: string;
   workflowVersionId: string;
   status: WorkflowRunStatus;
+  inputPayload: Record<string, unknown>;
   startedAt: Date | null;
   completedAt: Date | null;
 };
@@ -131,6 +132,7 @@ class FakeRuntimeDb {
     id: "workflow-run-1",
     workflowVersionId: "workflow-version-1",
     status: "PENDING",
+    inputPayload: {},
     startedAt: null,
     completedAt: null
   };
@@ -164,6 +166,7 @@ class FakeRuntimeDb {
         filename?: string;
         format: "markdown" | "plain_text";
       }>;
+      contextPaths?: StepDefinition["context_paths"];
       agent?: StepDefinition["agent"];
     }>
   ) {
@@ -181,7 +184,7 @@ class FakeRuntimeDb {
         downstream: step.downstream,
         input_artifacts: [],
         output_artifacts: step.outputArtifacts ?? [],
-        context_paths: [],
+        context_paths: step.contextPaths ?? [],
         tool_capabilities: [],
         agent: step.agent,
         evaluate: {
@@ -751,6 +754,52 @@ describe("runNextReadyStep", () => {
     ).resolves.toMatchObject({ picked: true, outcome: "accepted" });
 
     expect(executions[0]?.workingDirectory).toBe(worktreePath);
+  });
+
+  it("uses workflow run input payload values as context path entrypoints", async () => {
+    const workingDirectory = await makeTempDirectory("requirements-worktree-");
+    const requirementsDirectory = path.join(workingDirectory, "docs", "requirements");
+    await mkdir(requirementsDirectory, { recursive: true });
+    await writeFile(
+      path.join(requirementsDirectory, "original-request.md"),
+      "Build the workflow.",
+      "utf8"
+    );
+    const db = new FakeRuntimeDb([
+      {
+        id: "step-1",
+        type: "agent",
+        evaluator: StepRunEvaluator.EVALUATOR_REVIEW,
+        contextPaths: [
+          {
+            path: "${inputPayload.requirementsPath}",
+            type: "directory"
+          }
+        ]
+      }
+    ]);
+    db.workflowRun.inputPayload = {
+      requirementsPath: "docs/requirements"
+    };
+    const executions: ExecuteStepRunWithCodexInput[] = [];
+
+    await expect(
+      runNextReadyStep(
+        dependencies(db, {
+          resolveWorkingDirectory: () => workingDirectory,
+          executeStepRun: createExecutor(db, executions)
+        })
+      )
+    ).resolves.toMatchObject({ picked: true, outcome: "accepted" });
+
+    expect(executions[0]?.runtimeContext?.contextPaths).toEqual([
+      {
+        path: "docs/requirements",
+        type: "directory",
+        absolutePath: requirementsDirectory,
+        promptPath: "docs/requirements"
+      }
+    ]);
   });
 
   it("uses the generated worktree as working directory and forwards agent options", async () => {

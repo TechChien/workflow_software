@@ -53,6 +53,76 @@ describe("resolveContextPath", () => {
     });
   });
 
+  it("resolves an input payload path relative to the worktree root", async () => {
+    const requirementsDirectory = path.join(workingDirectory, "docs", "requirements");
+    await mkdir(requirementsDirectory, { recursive: true });
+
+    await expect(
+      resolveContextPath(
+        workingDirectory,
+        {
+          path: "${inputPayload.requirementsPath}",
+          type: "directory"
+        },
+        {
+          inputPayload: {
+            requirementsPath: "docs/requirements"
+          }
+        }
+      )
+    ).resolves.toEqual({
+      path: "docs/requirements",
+      type: "directory",
+      status: "resolved",
+      absolutePath: requirementsDirectory
+    });
+  });
+
+  it("resolves an absolute input payload path", async () => {
+    const externalFile = path.join(externalDirectory, "requirements.md");
+    await writeFile(externalFile, "requirements", "utf8");
+
+    await expect(
+      resolveContextPath(
+        workingDirectory,
+        {
+          path: "${inputPayload.requirementsPath}",
+          type: "file"
+        },
+        {
+          inputPayload: {
+            requirementsPath: externalFile
+          }
+        }
+      )
+    ).resolves.toEqual({
+      path: externalFile,
+      type: "file",
+      status: "resolved",
+      absolutePath: externalFile
+    });
+  });
+
+  it("reports missing input payload paths as skipped", async () => {
+    await expect(
+      resolveContextPath(
+        workingDirectory,
+        {
+          path: "${inputPayload.requirementsPath}",
+          type: "directory"
+        },
+        {
+          inputPayload: {}
+        }
+      )
+    ).resolves.toMatchObject({
+      path: "${inputPayload.requirementsPath}",
+      type: "directory",
+      status: "skipped",
+      reason: "input_payload_path_missing"
+    });
+  });
+
   it("reports paths with the wrong declared type as skipped", async () => {
     const externalFile = path.join(externalDirectory, "notes.md");
     await writeFile(externalFile, "external context", "utf8");
