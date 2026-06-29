@@ -9,7 +9,10 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "pnpm --filter @workflow-software/shared build && tsc --noEmit -p tsconfig.json",
     "test": "tsc -p ../shared/tsconfig.json && vitest run",
+    "test:claude": "tsc -p ../shared/tsconfig.json && vitest run claude-code-agent.test.ts claude-agent.integration.test.ts",
+    "test:claude:integration": "tsc -p ../shared/tsconfig.json && vitest run claude-agent.integration.test.ts",
     "test:watch": "tsc -p ../shared/tsconfig.json && vitest",
+    "claude:smoke": "tsx src/claude/smoke.ts",
     "codex:smoke": "tsx src/codex/smoke.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev"

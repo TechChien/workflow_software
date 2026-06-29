@@ -126,6 +126,20 @@ Set either value to `codex` to use the Codex adapter. Claude Code auth and
 gateway variables are passed through from `worker/.env`; do not include secrets
 inside persisted workflow data.
 
+Run a direct Claude Agent smoke turn through the configured Claude Code auth or
+Claude Code Router gateway:
+
+```powershell
+$env:ANTHROPIC_BASE_URL="https://your-anthropic-compatible-gateway.example/v1"
+$env:ANTHROPIC_AUTH_TOKEN="replace-with-router-token"
+pnpm.cmd --filter @workflow-software/worker claude:smoke -- "Inspect this workspace in one short sentence."
+```
+
+The smoke command runs a real `ClaudeCodeAgent` turn, prints JSONL lifecycle
+events, and requires the final response to contain `CLAUDE_SMOKE_DONE`. It uses a
+read-only permission profile by default; pass `--workspace-write` only when the
+prompt should test executor write access.
+
 Run the UI:
 
 ```bash
@@ -151,6 +165,22 @@ The test rolls back database rows, leaves the created git worktree on disk, and 
 ```powershell
 git -C "C:\path\to\actual\repo" worktree remove --force "<printed-worktree-path>"
 ```
+
+Run the opt-in Claude Agent integration test without DB persistence:
+
+```powershell
+$env:RUN_CLAUDE_AGENT_INTEGRATION="true"
+$env:ANTHROPIC_BASE_URL="https://your-anthropic-compatible-gateway.example/v1"
+$env:ANTHROPIC_AUTH_TOKEN="replace-with-router-token"
+pnpm.cmd --filter @workflow-software/worker test:claude:integration
+```
+
+The test performs a real read-only Claude turn through the same SDK adapter and
+asserts that a session starts, `turn.completed` is recorded, usage is returned,
+and the final response includes `CLAUDE_AGENT_INTEGRATION_DONE`.
+
+Manual Claude Code Router test items are tracked in
+`docs/testing/claude-agent-router-manual-test-plan.md`.
 
 Build all packages:
 

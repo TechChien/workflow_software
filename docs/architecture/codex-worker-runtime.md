@@ -156,6 +156,26 @@ unique per StepRun when present, preventing duplicate completed SDK items.
 Unit tests inject a fake `CodexGateway` and in-memory `CodexRunRecorder`; they do
 not initialize Prisma or connect to PostgreSQL.
 
+The direct Claude Agent smoke command calls the real Claude Agent SDK through
+the configured Claude Code auth or `ANTHROPIC_BASE_URL` gateway/proxy, uses a
+read-only profile by default, and does not persist data:
+
+```bash
+pnpm --filter @workflow-software/worker claude:smoke -- "Reply with a short workspace summary."
+```
+
+It prints JSONL lifecycle events and requires the final response to include
+`CLAUDE_SMOKE_DONE`. Pass `--workspace-write` to exercise executor permissions,
+and set `ANTHROPIC_BASE_URL` plus the relevant Claude Code auth token when
+testing through Claude Code Router.
+
+The opt-in Claude Agent integration test performs the same kind of real SDK
+turn inside Vitest without requiring database persistence:
+
+```bash
+RUN_CLAUDE_AGENT_INTEGRATION=true pnpm --filter @workflow-software/worker test:claude:integration
+```
+
 The opt-in smoke command calls the real SDK, uses workspace-write/no-network, and
 does not persist data:
 
